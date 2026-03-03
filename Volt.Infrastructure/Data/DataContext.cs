@@ -13,8 +13,8 @@ namespace Volt.Infrastructure.Data
         public DataContext(DbContextOptions<DataContext> options) : base(options)
         {
         }
+        public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
 
-        public DbSet<Product>  Products { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(DataContext).Assembly);
