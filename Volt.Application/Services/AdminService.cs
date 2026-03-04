@@ -58,34 +58,6 @@ namespace Volt.Application.Services
             return ApiResponse<AdminDto>.SuccessResponse(data);
         }
 
-        public async Task<ApiResponse<AdminDto>> CreateAsync(AdminCreateRequest request, CancellationToken ct = default)
-        {
-           var repo = _uow.Repository<AdminUser>();
-
-            var exists = await repo.AnyAsync(x => x.Username == request.Username, ct);
-
-            if (exists)
-            {
-                return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.INVALID_PASSWORD,"Username already exists.");
-            }
-
-            _passwordHelper.CreatePasswordHash(request.Password, out byte[] passwordHash, out byte[] passwordSalt);
-
-            var admin = new AdminUser
-            {
-                Username = request.Username,
-                Role = Role.Admin,
-                PasswordHash = passwordHash,
-                PasswordSalt = passwordSalt,
-                Is_active = true
-            };
-
-            await repo.AddAsync(admin, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            return ApiResponse<AdminDto>.SuccessResponse(null);
-        }
-
         public async Task<ApiResponse<AdminDto>> UpdateAsync(int id, AdminUpdateRequest request, CancellationToken ct = default)
         {
             var repo = _uow.Repository<AdminUser>();
@@ -139,6 +111,34 @@ namespace Volt.Application.Services
             await _uow.SaveChangesAsync(ct);
 
             return ApiResponse<NoContentDto>.SuccessResponse(null);
+        }
+
+        public Task<ApiResponse<NoContentDto>> Create(string name, string password)
+        {
+            
+            var repo = _uow.Repository<AdminUser>();
+
+           
+            _passwordHelper.CreatePasswordHash(password, out byte[] passwordHash, out byte[] passwordSalt);
+
+            var newAdmin = new AdminUser
+            {
+                Username = name,
+                PasswordHash = passwordHash,
+                PasswordSalt = passwordSalt,
+                Role = Role.Admin,
+                Is_active = true
+            };
+
+            repo.AddAsync(newAdmin);
+            return _uow.SaveChangesAsync().ContinueWith(t =>
+            {
+                if (t.IsFaulted)
+                {
+                    return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "An error occurred while creating the admin user.");
+                }
+                return ApiResponse<NoContentDto>.SuccessResponse(null);
+            });
         }
     }
 }

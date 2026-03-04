@@ -33,6 +33,7 @@ namespace Volt.Infrastructure.Repositories
         public Task<List<T>> ListNoTrackingAsync(CancellationToken ct = default) => _dbSet.AsNoTracking().ToListAsync(ct);
 
         public Task<List<T>> ListNoTrackingAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) => _dbSet.AsNoTracking().Where(predicate).ToListAsync(ct);
+
         public void Remove(T entity) => _dbSet.Remove(entity);
         public void Update(T entity) => _dbSet.Update(entity);
     }

@@ -12,5 +12,7 @@ namespace Volt.Domain.Common
         public const string VALIDATION_ERROR = "VALIDATION_ERROR";
         public const string INVALID_USERNAME = "INVALID_USERNAME";
         public const string INVALID_PASSWORD = "INVALID_PASSWORD";
+
+        
     }
 }
