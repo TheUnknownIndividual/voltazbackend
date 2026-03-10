@@ -46,6 +46,10 @@ namespace Volt.Application.Services
             var repo = _uow.Repository<AdminUser>();
             var admin =  await repo.FirstOrDefaultNoTrackingAsync(x => x.Id == id, ct);
 
+            if (admin is null)
+            {
+                return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
+            }
             var data = new AdminDto (
 
                 admin.Id,
@@ -63,9 +67,9 @@ namespace Volt.Application.Services
             var repo = _uow.Repository<AdminUser>();
             var admin = await repo.FirstOrDefaultAsync(x=> x.Id == id, ct);
 
-            if (admin == null)
+            if (admin is null)
             {
-                return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "Admin user not found.");
+                return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
             }
 
             admin.Username = request.Username;
@@ -81,9 +85,9 @@ namespace Volt.Application.Services
             var repo = _uow.Repository<AdminUser>();
             var admin = await repo.FirstOrDefaultAsync(x => x.Id == id, ct);
 
-            if (admin == null)
+            if (admin is null)
             {
-                return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "Admin user not found.");
+                return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
             }
 
             _passwordHelper.CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwordSalt);
@@ -102,9 +106,9 @@ namespace Volt.Application.Services
             var repo = _uow.Repository<AdminUser>();
             var admin = await repo.FirstOrDefaultAsync(x => x.Id == id, ct);
 
-            if (admin == null)
+            if (admin is null)
             {
-                return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "Admin user not found.");
+                return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
             }
 
             repo.Remove(admin);
@@ -113,32 +117,35 @@ namespace Volt.Application.Services
             return ApiResponse<NoContentDto>.SuccessResponse(null);
         }
 
-        public Task<ApiResponse<NoContentDto>> Create(string name, string password)
+        public async Task<ApiResponse<NoContentDto>> Create(string name, string password)
         {
-            
-            var repo = _uow.Repository<AdminUser>();
 
-           
-            _passwordHelper.CreatePasswordHash(password, out byte[] passwordHash, out byte[] passwordSalt);
-
-            var newAdmin = new AdminUser
+            try
             {
-                Username = name,
-                PasswordHash = passwordHash,
-                PasswordSalt = passwordSalt,
-                Role = Role.Admin,
-                Is_active = true
-            };
+                var repo = _uow.Repository<AdminUser>();
 
-            repo.AddAsync(newAdmin);
-            return _uow.SaveChangesAsync().ContinueWith(t =>
-            {
-                if (t.IsFaulted)
+                _passwordHelper.CreatePasswordHash(password, out byte[] passwordHash, out byte[] passwordSalt);
+
+                var newAdmin = new AdminUser
                 {
-                    return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "An error occurred while creating the admin user.");
-                }
+                    Username = name,
+                    PasswordHash = passwordHash,
+                    PasswordSalt = passwordSalt,
+                    Role = Role.Admin,
+                    Is_active = true
+                };
+
+                await repo.AddAsync(newAdmin);
+                await _uow.SaveChangesAsync();
+
                 return ApiResponse<NoContentDto>.SuccessResponse(null);
-            });
+            }
+            catch
+            {
+                return ApiResponse<NoContentDto>.ErrorResponse(
+                    ErrorCode.SERVER_ERROR,
+                    "An error occurred while creating the admin user.");
+            }
         }
     }
 }

@@ -9,27 +9,27 @@ namespace Volt.API.Controllers
     public class CustomBaseController : ControllerBase
     {
         [NonAction]
-        public IActionResult CreateActionResult<T>(T data)
+        public IActionResult CreateActionResult<T>(ApiResponse<T> result) // T data yox, ApiResponse<T> result
         {
-            if (data == null)
+            // Əgər result özü null-dursa (çox nadir hal), boş response qaytar
+            if (result == null)
             {
-                return new ObjectResult(ApiResponse<T>.SuccessResponse(default))
-                {
-                    StatusCode = 200
-                };
-
+                return new ObjectResult(null) { StatusCode = 204 };
             }
 
-            return new ObjectResult(ApiResponse<T>.SuccessResponse(data))
+            // Artıq result.SuccessService-də təyin olunub. 
+            // Biz sadəcə bu hazır obyekti status kodu ilə birlikdə qaytarırıq.
+            return new ObjectResult(result)
             {
-                StatusCode = 200
+                StatusCode = result.Success ? 200 : 400
             };
         }
 
+        // Xəta cavabları üçün (400 Bad Request)
         [NonAction]
         public IActionResult CreateErrorResult(string errorCode, object details = null)
         {
-            return new ObjectResult(ApiResponse<string>.ErrorResponse(errorCode, details))
+            return new ObjectResult(ApiResponse<object>.ErrorResponse(errorCode, details))
             {
                 StatusCode = 400
             };

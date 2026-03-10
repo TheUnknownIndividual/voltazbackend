@@ -31,22 +31,22 @@ namespace Volt.API.Controllers
         [HttpPut("{id:int}/password")]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] AdminChangePasswordRequest request, CancellationToken ct)
         {
-            await _service.ChangePasswordAsync(id, request, ct);
-            return CreateActionResult("Password updated");
+            var result =  await _service.ChangePasswordAsync(id, request, ct);
+            return CreateActionResult(result);
         }
 
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
         {
-            await _service.DeleteAsync(id, ct);
-            return CreateActionResult("Deleted");
+            var result = await _service.DeleteAsync(id, ct);
+            return CreateActionResult(result);
         }
 
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] AdminCreateRequest request, CancellationToken ct)
         {
-            await _service.Create(request.Username, request.Password);
-            return CreateActionResult("Admin created");
+            var result = await _service.Create(request.Username, request.Password);
+            return CreateActionResult(result);
         }
     }
 }
