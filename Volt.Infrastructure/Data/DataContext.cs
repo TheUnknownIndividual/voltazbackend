@@ -14,6 +14,9 @@ namespace Volt.Infrastructure.Data
         {
         }
         public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+        public DbSet<About> Abouts { get; set; }
+        public DbSet<AboutImage> AboutImages { get; set; }
+        public DbSet<AboutLanguage> AboutLanguages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
