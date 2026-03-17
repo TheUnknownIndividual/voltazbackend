@@ -17,6 +17,9 @@ namespace Volt.Infrastructure.Configuration
 
             builder.HasKey(al => al.Id);
 
+            builder.Property(al => al.LanguageCode)
+                .IsRequired();
+
             builder.Property(al => al.Title)
                 .IsRequired()
                 .HasMaxLength(150);

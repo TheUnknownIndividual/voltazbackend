@@ -15,11 +15,13 @@ namespace Volt.Domain.Common
         public const string ADMIN_NOT_FOUND = "Admin not found";
 
 
-        //public static readonly ErrorCode AboutNotFound = new("AboutNotFound", "About not found");
-        //public static readonly ErrorCode AboutLanguageDuplicate = new("AboutLanguageDuplicate", "Duplicate language exists for about");
-        //public static readonly ErrorCode InvalidAboutImageFormat = new("InvalidAboutImageFormat", "Invalid about image format");
-        //public static readonly ErrorCode AboutImageNotFound = new("AboutImageNotFound", "About image not found");
-        //public static readonly ErrorCode InvalidAboutRequest = new("InvalidAboutRequest", "Invalid about request");
-        //public static readonly ErrorCode InvalidAboutReorderRequest = new("InvalidAboutReorderRequest", "Invalid about reorder request");
+        public const string ABOUT_NOT_FOUND = "About not found";
+        public const string ABOUT_LANGUAGE_DUPLICATE = "Duplicate language exists for about";
+        public const string ABOUT_IMAGE_NOT_FOUND = "About image not found";
+        public const string INVALID_ABOUT_REQUEST = "Invalid about request";
+        public const string INVALID_ABOUT_REORDER_REQUEST = "Invalid about reorder request";
+
+        public const string FILE_REQUIRED = "File is required";
+        public const string FILE_URL_REQUIRED = "File url is required";
     }
 }

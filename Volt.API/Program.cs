@@ -11,6 +11,7 @@ using Volt.Application.Interfaces;
 using Volt.Application.Security;
 using Volt.Application.Services;
 using Volt.Domain.Interfaces;
+using Volt.Infrastructure.Configuration;
 using Volt.Infrastructure.Data;
 using Volt.Infrastructure.Services;
 using Volt.Infrastructure.UOW;
@@ -35,6 +36,12 @@ namespace Volt.API
             builder.Services.AddScoped<PasswordHelper>();
             builder.Services.AddScoped<IAdminAuthService, AdminAuthService>();
             builder.Services.AddScoped<IAdminService, AdminService>();
+
+            builder.Services.Configure<FtpOptions>(builder.Configuration.GetSection("FtpOptions"));
+
+            builder.Services.AddScoped<IAboutService, AboutService>();
+            builder.Services.AddScoped<IUploadService, UploadService>();
+            builder.Services.AddScoped<IFileService, FileService>();
 
             builder.Services.AddScoped<ITokenService, TokenService>();
 
@@ -74,6 +81,8 @@ namespace Volt.API
             app.UseMiddleware<ExceptionMiddleware>();
 
             app.UseHttpsRedirection();
+            
+            app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 
             app.UseAuthentication();
             app.UseAuthorization();

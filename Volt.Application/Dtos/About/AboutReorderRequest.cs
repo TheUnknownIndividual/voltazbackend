@@ -7,15 +7,12 @@ using System.Threading.Tasks;
 
 namespace Volt.Application.Dtos.About
 {
-    public class AboutCreateRequest
+    public class AboutReorderRequest
     {
         [Required]
-        public int Position { get; set; }
+        public int Id { get; set; }
 
         [Required]
-        [MinLength(1)]
-        public List<AboutLanguageCreateRequest> Languages { get; set; }
-
-        public List<string>? ImagePaths { get; set; }
+        public int Position { get; set; }
     }
 }
