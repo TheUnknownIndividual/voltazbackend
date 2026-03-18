@@ -17,7 +17,8 @@ namespace Volt.Infrastructure.Data
         public DbSet<About> Abouts { get; set; }
         public DbSet<AboutImage> AboutImages { get; set; }
         public DbSet<AboutLanguage> AboutLanguages { get; set; }
-
+        public DbSet<Step> Steps { get; set; }
+        public DbSet<StepLanguage> StepLanguages { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(DataContext).Assembly);

@@ -23,5 +23,11 @@ namespace Volt.Domain.Common
 
         public const string FILE_REQUIRED = "File is required";
         public const string FILE_URL_REQUIRED = "File url is required";
+
+        public const string STEP_NOT_FOUND = "Step not found";
+        public const string STEP_LANGUAGE_DUPLICATE = "Duplicate language exists for step";
+        public const string INVALID_STEP_REQUEST = "Invalid step request";
+        public const string INVALID_STEP_REORDER_REQUEST = "Invalid step reorder request";
+        public const string STEP_IMAGE_REQUIRED = "Step image is required";
     }
 }
