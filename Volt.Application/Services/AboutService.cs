@@ -76,7 +76,7 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<IReadOnlyList<AboutDto>>> GetAllAsync(CancellationToken ct = default)
         {
-            var abouts = await _uow.Repository<About>().ListNoTrackingAsync(ct);
+            var abouts = await _uow.Repository<About>().ListNoTrackingAsync(x=> x.IsActive , ct);
             var languages = await _uow.Repository<AboutLanguage>().ListNoTrackingAsync(ct);
             var images = await _uow.Repository<AboutImage>().ListNoTrackingAsync(ct);
 
@@ -93,7 +93,7 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<AboutDto>> GetByIdAsync(int id, CancellationToken ct = default)
         {
-            var about = await _uow.Repository<About>().FirstOrDefaultNoTrackingAsync(x => x.Id == id, ct);
+            var about = await _uow.Repository<About>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
 
             if (about is null)
             {
@@ -109,7 +109,7 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<AboutDto>> UpdateAsync(int id, AboutUpdateRequest request, CancellationToken ct = default)
         {
             var aboutRepo = _uow.Repository<About>();
-            var about = await aboutRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var about = await aboutRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
 
             if (about is null)
             {

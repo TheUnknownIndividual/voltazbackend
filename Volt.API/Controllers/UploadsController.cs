@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Volt.API.Models;
 using Volt.Application.Dtos;
 using Volt.Application.Interfaces;
@@ -15,6 +16,7 @@ namespace Volt.API.Controllers
             _uploadService = uploadService;
         }
 
+        [Authorize]
         [HttpPost("image")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadImage([FromForm] UploadImageFormRequest form, CancellationToken ct)
@@ -44,11 +46,11 @@ namespace Volt.API.Controllers
             return CreateActionResult(await _uploadService.UploadImageAsync(request, ct));
         }
 
+        [Authorize]
         [HttpDelete("image")]
         public async Task<IActionResult> DeleteImage([FromQuery] string fileUrl, CancellationToken ct)
         {
            
-
             return CreateActionResult(await _uploadService.DeleteImageAsync(fileUrl, ct));
         }
     }

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Volt.Application.Dtos.Admin;
 using Volt.Application.Interfaces;
@@ -16,18 +17,22 @@ namespace Volt.API.Controllers
             _service = service;
         }
 
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll(CancellationToken ct)
             => CreateActionResult(await _service.GetAllAsync(ct));
 
+        [Authorize]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id, CancellationToken ct)
             => CreateActionResult(await _service.GetByIdAsync(id, ct));
 
+        [Authorize]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] AdminUpdateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.UpdateAsync(id, request, ct));
 
+        [Authorize]
         [HttpPut("{id:int}/password")]
         public async Task<IActionResult> ChangePassword(int id, [FromBody] AdminChangePasswordRequest request, CancellationToken ct)
         {
@@ -35,6 +40,7 @@ namespace Volt.API.Controllers
             return CreateActionResult(result);
         }
 
+        [Authorize]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
         {
@@ -42,6 +48,7 @@ namespace Volt.API.Controllers
             return CreateActionResult(result);
         }
 
+        [Authorize]
         [HttpPost("create")]
         public async Task<IActionResult> Create([FromBody] AdminCreateRequest request, CancellationToken ct)
         {

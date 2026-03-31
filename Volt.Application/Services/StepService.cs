@@ -69,7 +69,7 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<IReadOnlyList<StepDto>>> GetAllAsync(CancellationToken ct = default)
         {
-            var steps = await _uow.Repository<Step>().ListNoTrackingAsync(ct);
+            var steps = await _uow.Repository<Step>().ListNoTrackingAsync( x=> x.IsActive, ct);
             var languages = await _uow.Repository<StepLanguage>().ListNoTrackingAsync(ct);
 
             var result = steps
@@ -84,7 +84,7 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<StepDto>> GetByIdAsync(int id, CancellationToken ct = default)
         {
-            var step = await _uow.Repository<Step>().FirstOrDefaultNoTrackingAsync(x => x.Id == id, ct);
+            var step = await _uow.Repository<Step>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
 
             if (step is null)
             {
@@ -100,7 +100,7 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<StepDto>> UpdateAsync(int id, StepUpdateRequest request, CancellationToken ct = default)
         {
             var stepRepo = _uow.Repository<Step>();
-            var step = await stepRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var step = await stepRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
 
             if (step is null)
             {

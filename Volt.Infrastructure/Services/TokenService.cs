@@ -37,6 +37,7 @@ namespace Volt.Infrastructure.Services
                 issuer: _config["TokenOptions:Issuer"],
                 audience: _config["TokenOptions:Audience"],
                 claims: claims,
+                expires: DateTime.UtcNow.AddDays(1),
                 signingCredentials: creds
             );
             var tokenstring = new JwtSecurityTokenHandler().WriteToken(token);

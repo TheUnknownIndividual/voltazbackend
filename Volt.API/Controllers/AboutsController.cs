@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Volt.Application.Dtos.About;
 using Volt.Application.Interfaces;
 
@@ -21,18 +22,22 @@ namespace Volt.API.Controllers
         public async Task<IActionResult> GetById(int id, CancellationToken ct)
             => CreateActionResult(await _service.GetByIdAsync(id, ct));
 
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] AboutCreateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.CreateAsync(request, ct));
 
+        [Authorize]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] AboutUpdateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.UpdateAsync(id, request, ct));
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
             => CreateActionResult(await _service.DeleteAsync(id, ct));
 
+        [Authorize]
         [HttpPut("reorder")]
         public async Task<IActionResult> Reorder([FromBody] List<AboutReorderRequest> request, CancellationToken ct)
             => CreateActionResult(await _service.ReorderAsync(request, ct));

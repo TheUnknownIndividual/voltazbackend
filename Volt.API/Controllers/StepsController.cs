@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Volt.Application.Dtos.Step;
 using Volt.Application.Interfaces;
@@ -23,18 +24,22 @@ namespace Volt.API.Controllers
         public async Task<IActionResult> GetById(int id, CancellationToken ct)
             => CreateActionResult(await _service.GetByIdAsync(id, ct));
 
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] StepCreateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.CreateAsync(request, ct));
 
+        [Authorize]
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] StepUpdateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.UpdateAsync(id, request, ct));
 
+        [Authorize]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
             => CreateActionResult(await _service.DeleteAsync(id, ct));
 
+        [Authorize]
         [HttpPut("reorder")]
         public async Task<IActionResult> Reorder([FromBody] List<StepReorderRequest> request, CancellationToken ct)
             => CreateActionResult(await _service.ReorderAsync(request, ct));
