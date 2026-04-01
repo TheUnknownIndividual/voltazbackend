@@ -31,10 +31,11 @@ namespace Volt.Application.Services
 
             try
             {
+                int nextPosition = (await _uow.Repository<Step>().MaxAsync(x => x.Position, ct)) + 1;
                 var step = new Step
                 {
                     ImagePath = request.ImagePath.Trim(),
-                    Position = request.Position,
+                    Position = nextPosition,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -89,8 +90,7 @@ namespace Volt.Application.Services
             if (step is null)
             {
                 return ApiResponse<StepDto>.ErrorResponse(
-                    ErrorCode.STEP_NOT_FOUND,
-                    ErrorCode.STEP_NOT_FOUND);
+                    ErrorCode.STEP_NOT_FOUND,"Step not found");
             }
 
             var dto = await BuildStepDtoAsync(id, ct);
@@ -105,8 +105,7 @@ namespace Volt.Application.Services
             if (step is null)
             {
                 return ApiResponse<StepDto>.ErrorResponse(
-                    ErrorCode.STEP_NOT_FOUND,
-                    ErrorCode.STEP_NOT_FOUND);
+                    ErrorCode.STEP_NOT_FOUND, "Step not found");
             }
 
             var validationError = ValidateRequest(request.Languages, request.ImagePath);
@@ -141,13 +140,12 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default)
         {
             var stepRepo = _uow.Repository<Step>();
-            var step = await stepRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var step = await stepRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
 
             if (step is null)
             {
                 return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.STEP_NOT_FOUND,
-                    ErrorCode.STEP_NOT_FOUND);
+                    ErrorCode.STEP_NOT_FOUND, "Step not found");
             }
 
             try

@@ -29,5 +29,11 @@ namespace Volt.Domain.Common
         public const string INVALID_STEP_REQUEST = "Invalid step request";
         public const string INVALID_STEP_REORDER_REQUEST = "Invalid step reorder request";
         public const string STEP_IMAGE_REQUIRED = "Step image is required";
+
+        public const string SERVICE_NOT_FOUND = "Service not found";
+        public const string SERVICE_LANGUAGE_DUPLICATE = "Duplicate language exists for service";
+        public const string INVALID_SERVICE_REQUEST = "Invalid service request";
+        public const string INVALID_SERVICE_REORDER_REQUEST = "Invalid service reorder request";
+        public const string SERVICE_IMAGE_REQUIRED = "Service image is required";
     }
 }

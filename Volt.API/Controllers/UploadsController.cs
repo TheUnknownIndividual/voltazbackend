@@ -24,7 +24,7 @@ namespace Volt.API.Controllers
             if (form?.File is null)
             {
                 return CreateActionResult(
-                    Volt.Application.Dtos.ApiResponse<UploadImageDto>.ErrorResponse(
+                    ApiResponse<UploadImageDto>.ErrorResponse(
                         ErrorCode.VALIDATION_ERROR,
                         ErrorCode.FILE_REQUIRED));
             }

@@ -10,9 +10,6 @@ namespace Volt.Application.Dtos.About
     public class AboutCreateRequest
     {
         [Required]
-        public int Position { get; set; }
-
-        [Required]
         [MinLength(1)]
         public List<AboutLanguageCreateRequest> Languages { get; set; }
 

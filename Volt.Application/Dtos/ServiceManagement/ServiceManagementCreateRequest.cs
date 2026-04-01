@@ -4,16 +4,17 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Volt.Application.Dtos.Step;
 
-namespace Volt.Application.Dtos.Step
+namespace Volt.Application.Dtos.ServiceManagement
 {
-    public class StepCreateRequest
+    public class ServiceManagementCreateRequest
     {
         [Required]
         public string ImagePath { get; set; }
 
         [Required]
         [MinLength(1)]
-        public List<StepLanguageCreateRequest> Languages { get; set; }
+        public List<ServiceManagementLanguageCreateRequest> Languages { get; set; }
     }
 }

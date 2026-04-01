@@ -19,6 +19,9 @@ namespace Volt.Infrastructure.Data
         public DbSet<AboutLanguage> AboutLanguages { get; set; }
         public DbSet<Step> Steps { get; set; }
         public DbSet<StepLanguage> StepLanguages { get; set; }
+        public DbSet<ServiceManagement> ServiceManagements { get; set; }
+        public DbSet<ServiceManagementLanguage> ServiceManagementLanguages { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(DataContext).Assembly);

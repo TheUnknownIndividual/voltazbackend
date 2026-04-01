@@ -32,11 +32,13 @@ namespace Volt.Application.Services
 
             try
             {
+                int nextPosition = (await _uow.Repository<About>().MaxAsync(x => x.Position, ct)) + 1;
+
                 var aboutRepo = _uow.Repository<About>();
 
                 var about = new About
                 {
-                    Position = request.Position,
+                    Position = nextPosition,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = null

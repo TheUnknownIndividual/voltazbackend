@@ -34,6 +34,12 @@ namespace Volt.Infrastructure.Repositories
 
         public Task<List<T>> ListNoTrackingAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) => _dbSet.AsNoTracking().Where(predicate).ToListAsync(ct);
 
+        public async Task<int> MaxAsync(Expression<Func<T, int>> selector, CancellationToken ct = default)
+        {
+            // Cədvəl boşdursa 0, dolu dursa Max rəqəmi qaytarır
+            return await _dbSet.Select(selector).OrderByDescending(x => x).FirstOrDefaultAsync(ct);
+        }
+
         public void Remove(T entity) => _dbSet.Remove(entity);
         public void Update(T entity) => _dbSet.Update(entity);
     }

@@ -27,5 +27,7 @@ namespace Volt.Domain.Interfaces
 
         void Remove(T entity);
 
+        Task<int> MaxAsync(Expression<Func<T, int>> selector, CancellationToken ct = default);
+
     }
 }
