@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -35,5 +35,9 @@ namespace Volt.Domain.Common
         public const string INVALID_SERVICE_REQUEST = "Invalid service request";
         public const string INVALID_SERVICE_REORDER_REQUEST = "Invalid service reorder request";
         public const string SERVICE_IMAGE_REQUIRED = "Service image is required";
+
+        public const string APPLICATION_TYPE_NOT_FOUND = "Application type not found";
+        public const string APPLICATION_TYPE_LANGUAGE_DUPLICATE = "Duplicate language exists for application type";
+        public const string INVALID_APPLICATION_TYPE_REQUEST = "Invalid application type request";
     }
 }

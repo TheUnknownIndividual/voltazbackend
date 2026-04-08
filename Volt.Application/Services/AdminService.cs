@@ -35,7 +35,7 @@ namespace Volt.Application.Services
                 x.Id,
                 x.Username, 
                 x.Role,
-                x.Is_active))
+                x.IsActive))
                 .ToList();
 
             return ApiResponse<IReadOnlyList<AdminDto>>.SuccessResponse(newlist);
@@ -55,7 +55,7 @@ namespace Volt.Application.Services
                 admin.Id,
                 admin.Username,
                 admin.Role,
-                admin.Is_active
+                admin.IsActive
                 
                 );
 
@@ -132,7 +132,7 @@ namespace Volt.Application.Services
                     PasswordHash = passwordHash,
                     PasswordSalt = passwordSalt,
                     Role = Role.Admin,
-                    Is_active = true
+                    IsActive = true
                 };
 
                 await repo.AddAsync(newAdmin);

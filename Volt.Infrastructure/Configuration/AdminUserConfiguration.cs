@@ -16,7 +16,7 @@ namespace Volt.Infrastructure.Configuration
                 .IsRequired()
                 .HasMaxLength(100);
 
-            builder.Property(x => x.Is_active)
+            builder.Property(x => x.IsActive)
             .HasDefaultValue(true)
             .IsRequired();
         }

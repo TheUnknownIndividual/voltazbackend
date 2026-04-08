@@ -21,6 +21,13 @@ namespace Volt.Infrastructure.Data
         public DbSet<StepLanguage> StepLanguages { get; set; }
         public DbSet<ServiceManagement> ServiceManagements { get; set; }
         public DbSet<ServiceManagementLanguage> ServiceManagementLanguages { get; set; }
+        public DbSet<ApplicationType> ApplicationTypes { get; set; }
+        public DbSet<ApplicationTypeLanguage> ApplicationTypeLanguages { get; set; }
+        public DbSet<ContactInfo> ContactInfos { get; set; }
+        public DbSet<ContactLanguage> ContactLanguages { get; set; }
+        public DbSet<PhoneNumber> PhoneNumbers { get; set; }
+        public DbSet<EmailAddress> EmailAddresses { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

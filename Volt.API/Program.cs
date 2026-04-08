@@ -44,6 +44,7 @@ namespace Volt.API
             builder.Services.AddScoped<IFileService, FileService>();
             builder.Services.AddScoped<IStepService, StepService>();
             builder.Services.AddScoped<IServiceManagementService, ServiceManagementService>();
+            builder.Services.AddScoped<IApplicationTypeService, ApplicationTypeService>();
 
             builder.Services.AddScoped<ITokenService, TokenService>();
 

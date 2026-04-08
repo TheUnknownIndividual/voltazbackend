@@ -7,13 +7,13 @@ using Volt.Domain.Enums;
 
 namespace Volt.Domain.Entities
 {
-    public class AdminUser
+    public class ApplicationTypeLanguage
     {
         public int Id { get; set; }
-        public string Username { get; set; }
-        public byte[] PasswordHash { get; set; }
-        public byte[] PasswordSalt { get; set; }
-        public Role Role { get; set; }
+        public int ApplicationTypeId { get; set; }
+        public ApplicationType ApplicationType { get; set; }
+        public LanguageCode LanguageCode { get; set; }
+        public string Name { get; set; }
         public bool IsActive { get; set; }
     }
 }
