@@ -22,7 +22,7 @@ namespace Volt.Application.Services
             _uow = uow;
         }
 
-        public async Task<ApiResponse<AboutDto>> CreateAsync(AboutCreateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<AboutDto>> CreateAsync(AboutCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var languageValidation = ValidateLanguages(request.Languages.Select(x => x.LanguageCode).ToList());
             if (languageValidation is not null)
@@ -65,7 +65,7 @@ namespace Volt.Application.Services
 
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildAboutDtoAsync(about.Id, ct);
+                var dto = await BuildAboutDtoAsync(about.Id, languageCode, ct);
                 return ApiResponse<AboutDto>.SuccessResponse(dto);
             }
             catch
@@ -76,7 +76,7 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<IReadOnlyList<AboutDto>>> GetAllAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<AboutDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var abouts = await _uow.Repository<About>().ListNoTrackingAsync(x=> x.IsActive , ct);
             var languages = await _uow.Repository<AboutLanguage>().ListNoTrackingAsync(ct);
@@ -87,13 +87,14 @@ namespace Volt.Application.Services
                 .Select(x => MapToAboutDto(
                     x,
                     languages.Where(l => l.AboutId == x.Id).OrderBy(l => l.Id).ToList(),
-                    images.Where(i => i.AboutId == x.Id).OrderBy(i => i.Id).ToList()))
+                    images.Where(i => i.AboutId == x.Id).OrderBy(i => i.Id).ToList(),
+                    languageCode))
                 .ToList();
 
             return ApiResponse<IReadOnlyList<AboutDto>>.SuccessResponse(result);
         }
 
-        public async Task<ApiResponse<AboutDto>> GetByIdAsync(int id, CancellationToken ct = default)
+        public async Task<ApiResponse<AboutDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var about = await _uow.Repository<About>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
 
@@ -104,11 +105,11 @@ namespace Volt.Application.Services
                     ErrorCode.ABOUT_NOT_FOUND);
             }
 
-            var dto = await BuildAboutDtoAsync(id, ct);
+            var dto = await BuildAboutDtoAsync(id, languageCode, ct);
             return ApiResponse<AboutDto>.SuccessResponse(dto);
         }
 
-        public async Task<ApiResponse<AboutDto>> UpdateAsync(int id, AboutUpdateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<AboutDto>> UpdateAsync(int id, AboutUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var aboutRepo = _uow.Repository<About>();
             var about = await aboutRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
@@ -153,7 +154,7 @@ namespace Volt.Application.Services
 
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildAboutDtoAsync(id, ct);
+                var dto = await BuildAboutDtoAsync(id, languageCode, ct);
                 return ApiResponse<AboutDto>.SuccessResponse(dto);
             }
             catch
@@ -377,7 +378,7 @@ namespace Volt.Application.Services
             }
         }
 
-        private async Task<AboutDto> BuildAboutDtoAsync(int aboutId, CancellationToken ct)
+        private async Task<AboutDto> BuildAboutDtoAsync(int aboutId, LanguageCode? languageCode, CancellationToken ct)
         {
             var about = await _uow.Repository<About>().FirstOrDefaultNoTrackingAsync(x => x.Id == aboutId, ct);
             var languages = await _uow.Repository<AboutLanguage>().ListNoTrackingAsync(x => x.AboutId == aboutId, ct);
@@ -386,21 +387,27 @@ namespace Volt.Application.Services
             return MapToAboutDto(
                 about,
                 languages.OrderBy(x => x.Id).ToList(),
-                images.OrderBy(x => x.Id).ToList());
+                images.OrderBy(x => x.Id).ToList(),
+                languageCode);
         }
 
         private AboutDto MapToAboutDto(
             About about,
             IEnumerable<AboutLanguage> languages,
-            IEnumerable<AboutImage> images)
+            IEnumerable<AboutImage> images,
+            LanguageCode? languageCode)
         {
+            var filteredLanguages = languageCode is null
+                ? languages
+                : languages.Where(x => x.LanguageCode == languageCode);
+
             return new AboutDto(
                 about.Id,
                 about.Position,
                 about.IsActive,
                 about.CreatedAt,
                 about.UpdatedAt,
-                languages.Select(x => new AboutLanguageDto(
+                filteredLanguages.Select(x => new AboutLanguageDto(
                     x.Id,
                     x.LanguageCode,
                     x.Title,

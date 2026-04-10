@@ -1,19 +1,19 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Volt.API.Infrastructure.Localization;
-using Volt.Application.Dtos.ApplicationType;
+using Volt.Application.Dtos.ContactInfo;
 using Volt.Application.Interfaces;
 
 namespace Volt.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public sealed class ApplicationTypesController : CustomBaseController
+    public sealed class ContactInfosController : CustomBaseController
     {
-        private readonly IApplicationTypeService _service;
+        private readonly IContactInfoService _service;
         private readonly IAcceptLanguageService _acceptLanguageService;
 
-        public ApplicationTypesController(IApplicationTypeService service, IAcceptLanguageService acceptLanguageService)
+        public ContactInfosController(IContactInfoService service, IAcceptLanguageService acceptLanguageService)
         {
             _service = service;
             _acceptLanguageService = acceptLanguageService;
@@ -29,12 +29,12 @@ namespace Volt.API.Controllers
 
         [Authorize]
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] ApplicationTypeCreateRequest request, CancellationToken ct)
+        public async Task<IActionResult> Create([FromBody] ContactInfoCreateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.CreateAsync(request, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [Authorize]
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] ApplicationTypeUpdateRequest request, CancellationToken ct)
+        public async Task<IActionResult> Update(int id, [FromBody] ContactInfoUpdateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.UpdateAsync(id, request, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [Authorize]

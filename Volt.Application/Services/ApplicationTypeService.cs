@@ -17,7 +17,7 @@ namespace Volt.Application.Services
             _uow = uow;
         }
 
-        public async Task<ApiResponse<IReadOnlyList<ApplicationTypeDto>>> GetAllAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<ApplicationTypeDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var appTypes = await _uow.Repository<ApplicationType>().ListNoTrackingAsync(x => x.IsActive, ct);
             var languages = await _uow.Repository<ApplicationTypeLanguage>().ListNoTrackingAsync(ct);
@@ -34,13 +34,14 @@ namespace Volt.Application.Services
                     languages
                         .Where(l => l.ApplicationTypeId == x.Id)
                         .OrderBy(l => l.Id)
-                        .ToList()))
+                        .ToList(),
+                    languageCode))
                 .ToList();
 
             return ApiResponse<IReadOnlyList<ApplicationTypeDto>>.SuccessResponse(result);
         }
 
-        public async Task<ApiResponse<ApplicationTypeDto>> GetByIdAsync(int id, CancellationToken ct = default)
+        public async Task<ApiResponse<ApplicationTypeDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var appType = await _uow.Repository<ApplicationType>()
                 .FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
@@ -52,11 +53,11 @@ namespace Volt.Application.Services
                     ErrorCode.APPLICATION_TYPE_NOT_FOUND);
             }
 
-            var dto = await BuildDtoAsync(id, ct);
+            var dto = await BuildDtoAsync(id, languageCode, ct);
             return ApiResponse<ApplicationTypeDto>.SuccessResponse(dto);
         }
 
-        public async Task<ApiResponse<ApplicationTypeDto>> CreateAsync(ApplicationTypeCreateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<ApplicationTypeDto>> CreateAsync(ApplicationTypeCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var languageValidation = ValidateLanguages(request?.Languages);
             if (languageValidation is not null)
@@ -102,7 +103,7 @@ namespace Volt.Application.Services
 
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildDtoAsync(appType.Id, ct);
+                var dto = await BuildDtoAsync(appType.Id, languageCode, ct);
                 return ApiResponse<ApplicationTypeDto>.SuccessResponse(dto);
             }
             catch
@@ -113,7 +114,7 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<ApplicationTypeDto>> UpdateAsync(int id, ApplicationTypeUpdateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<ApplicationTypeDto>> UpdateAsync(int id, ApplicationTypeUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var repo = _uow.Repository<ApplicationType>();
             var appType = await repo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
@@ -154,7 +155,7 @@ namespace Volt.Application.Services
                 await UpsertLanguagesAsync(id, request.Languages, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildDtoAsync(id, ct);
+                var dto = await BuildDtoAsync(id, languageCode, ct);
                 return ApiResponse<ApplicationTypeDto>.SuccessResponse(dto);
             }
             catch
@@ -248,7 +249,8 @@ namespace Volt.Application.Services
                     {
                         ApplicationTypeId = applicationTypeId,
                         LanguageCode = item.LanguageCode,
-                        Name = item.Name.Trim()
+                        Name = item.Name.Trim(),
+                        IsActive = item.IsActive
                     }, ct);
                 }
                 else
@@ -257,34 +259,41 @@ namespace Volt.Application.Services
                     if (tracked is not null)
                     {
                         tracked.Name = item.Name.Trim();
+                        tracked.IsActive = item.IsActive;
                         repo.Update(tracked);
                     }
                 }
             }
         }
 
-        private async Task<ApplicationTypeDto> BuildDtoAsync(int applicationTypeId, CancellationToken ct)
+        private async Task<ApplicationTypeDto> BuildDtoAsync(int applicationTypeId, LanguageCode? languageCode, CancellationToken ct)
         {
             var appType = await _uow.Repository<ApplicationType>()
                 .FirstOrDefaultNoTrackingAsync(x => x.Id == applicationTypeId, ct);
             var languages = await _uow.Repository<ApplicationTypeLanguage>()
                 .ListNoTrackingAsync(x => x.ApplicationTypeId == applicationTypeId, ct);
 
-            return MapToDto(appType, languages.OrderBy(x => x.Id).ToList());
+            return MapToDto(appType, languages.OrderBy(x => x.Id).ToList(), languageCode);
         }
 
-        private static ApplicationTypeDto MapToDto(ApplicationType appType, IReadOnlyList<ApplicationTypeLanguage> languages)
-            => new(
+        private static ApplicationTypeDto MapToDto(ApplicationType appType, IReadOnlyList<ApplicationTypeLanguage> languages, LanguageCode? languageCode)
+        {
+            var filteredLanguages = languageCode is null
+                ? languages
+                : languages.Where(x => x.LanguageCode == languageCode).ToList();
+
+            return new(
                 appType.Id,
                 appType.ServiceManagementId,
                 appType.IsActive,
                 appType.CreatedAt,
                 appType.UpdatedAt,
-                languages.Select(x => new ApplicationTypeLanguageDto(
+                filteredLanguages.Select(x => new ApplicationTypeLanguageDto(
                     x.Id,
                     x.LanguageCode,
                     x.Name,
                     x.IsActive)).ToList());
+        }
     }
 }
 

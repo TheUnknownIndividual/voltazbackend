@@ -39,5 +39,10 @@ namespace Volt.Domain.Common
         public const string APPLICATION_TYPE_NOT_FOUND = "Application type not found";
         public const string APPLICATION_TYPE_LANGUAGE_DUPLICATE = "Duplicate language exists for application type";
         public const string INVALID_APPLICATION_TYPE_REQUEST = "Invalid application type request";
+
+        public const string CONTACT_INFO_NOT_FOUND = "Contact info not found";
+        public const string CONTACT_LANGUAGE_DUPLICATE = "Duplicate language exists for contact info";
+        public const string INVALID_CONTACT_INFO_REQUEST = "Invalid contact info request";
+        public const string CONTACT_CHANNEL_REQUIRED = "At least one phone number or email is required";
     }
 }

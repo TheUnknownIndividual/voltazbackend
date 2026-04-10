@@ -9,6 +9,7 @@ using Volt.Application.Dtos.Step;
 using Volt.Application.Interfaces;
 using Volt.Domain.Common;
 using Volt.Domain.Entities;
+using Volt.Domain.Enums;
 using Volt.Domain.Interfaces;
 
 namespace Volt.Application.Services
@@ -21,7 +22,7 @@ namespace Volt.Application.Services
         {
             _uow = uow;
         }
-        public async Task<ApiResponse<ServiceManagementDto>> CreateAsync(ServiceManagementCreateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<ServiceManagementDto>> CreateAsync(ServiceManagementCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var validationError = ValidateRequest(request.Languages, request.ImagePath);
             if (validationError is not null)
@@ -59,7 +60,31 @@ namespace Volt.Application.Services
 
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildServiceDtoAsync(service.Id, ct);
+                var appType = new ApplicationType
+                {
+                    ServiceManagementId = service.Id,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = null
+                };
+
+                await _uow.Repository<ApplicationType>().AddAsync(appType, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                foreach (var language in request.Languages)
+                {
+                    await _uow.Repository<ApplicationTypeLanguage>().AddAsync(new ApplicationTypeLanguage
+                    {
+                        ApplicationTypeId = appType.Id,
+                        LanguageCode = language.LanguageCode,
+                        Name = language.Title.Trim(),
+                        IsActive = true
+                    }, ct);
+                }
+
+                await _uow.SaveChangesAsync(ct);
+
+                var dto = await BuildServiceDtoAsync(service.Id, languageCode, ct);
                 return ApiResponse<ServiceManagementDto>.SuccessResponse(dto);
             }
             catch 
@@ -68,7 +93,7 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<IReadOnlyList<ServiceManagementDto>>> GetAllAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<ServiceManagementDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var services = await _uow.Repository<ServiceManagement>().ListNoTrackingAsync(x => x.IsActive && x.ActiveStatus, ct);
             var languages = await _uow.Repository<ServiceManagementLanguage>().ListNoTrackingAsync(ct);
@@ -77,14 +102,15 @@ namespace Volt.Application.Services
                 .OrderBy(x => x.Position)
                 .Select(x => MapToServiceManagementDto(
                     x,
-                    languages.Where(l => l.ServiceMagamentId == x.Id).OrderBy(l => l.Id).ToList()))
+                    languages.Where(l => l.ServiceMagamentId == x.Id).OrderBy(l => l.Id).ToList(),
+                    languageCode))
                 .ToList();
 
             return ApiResponse<IReadOnlyList<ServiceManagementDto>>.SuccessResponse(result);
 
         }
 
-        public async Task<ApiResponse<ServiceManagementDto>> GetByIdAsync(int id, CancellationToken ct = default)
+        public async Task<ApiResponse<ServiceManagementDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var service = await _uow.Repository<ServiceManagement>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
 
@@ -93,11 +119,11 @@ namespace Volt.Application.Services
                 return ApiResponse<ServiceManagementDto>.ErrorResponse(ErrorCode.SERVICE_NOT_FOUND, "Service not found");
             }
 
-            var dto = await BuildServiceDtoAsync(service.Id, ct);
+            var dto = await BuildServiceDtoAsync(service.Id, languageCode, ct);
             return ApiResponse<ServiceManagementDto>.SuccessResponse(dto);
         }
 
-        public async Task<ApiResponse<ServiceManagementDto>> UpdateAsync(int id, ServiceManagementUpdateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<ServiceManagementDto>> UpdateAsync(int id, ServiceManagementUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var serviceRepo = _uow.Repository<ServiceManagement>();
             var service = await serviceRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
@@ -126,7 +152,7 @@ namespace Volt.Application.Services
                 await UpsertLanguagesAsync(id, request.Languages, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildServiceDtoAsync(service.Id, ct);
+                var dto = await BuildServiceDtoAsync(service.Id, languageCode, ct);
                 return ApiResponse<ServiceManagementDto>.SuccessResponse(dto);
             }
             catch 
@@ -298,15 +324,19 @@ namespace Volt.Application.Services
                 }
             }
         }
-        private async Task<ServiceManagementDto> BuildServiceDtoAsync(int servisId, CancellationToken ct)
+        private async Task<ServiceManagementDto> BuildServiceDtoAsync(int servisId, LanguageCode? languageCode, CancellationToken ct)
         {
             var service = await _uow.Repository<ServiceManagement>().FirstOrDefaultNoTrackingAsync(x => x.Id == servisId, ct);
             var languages = await _uow.Repository<ServiceManagementLanguage>().ListNoTrackingAsync(x => x.ServiceMagamentId == servisId, ct);
 
-            return MapToServiceManagementDto(service, languages.OrderBy(x => x.Id).ToList());
+            return MapToServiceManagementDto(service, languages.OrderBy(x => x.Id).ToList(), languageCode);
         }
-        private ServiceManagementDto MapToServiceManagementDto(ServiceManagement service, IEnumerable<ServiceManagementLanguage> languages)
+        private ServiceManagementDto MapToServiceManagementDto(ServiceManagement service, IEnumerable<ServiceManagementLanguage> languages, LanguageCode? languageCode)
         {
+            var filteredLanguages = languageCode is null
+                ? languages
+                : languages.Where(x => x.LanguageCode == languageCode);
+
             return new ServiceManagementDto(
                 service.Id,
                 service.ImagePath,
@@ -315,7 +345,7 @@ namespace Volt.Application.Services
                 service.ActiveStatus,
                 service.CreatedAt,
                 service.UpdatedAt,
-                languages.Select(x => new ServiceManagementLanguageDto(
+                filteredLanguages.Select(x => new ServiceManagementLanguageDto(
                     x.Id,
                     x.LanguageCode,
                     x.Title,

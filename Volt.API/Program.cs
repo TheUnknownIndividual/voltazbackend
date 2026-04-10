@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Text;
 using Volt.API.Infrastructure.Filters;
+using Volt.API.Infrastructure.Localization;
 using Volt.API.Middlewares;
 using Volt.Application.Interfaces;
 using Volt.Application.Security;
@@ -45,6 +46,8 @@ namespace Volt.API
             builder.Services.AddScoped<IStepService, StepService>();
             builder.Services.AddScoped<IServiceManagementService, ServiceManagementService>();
             builder.Services.AddScoped<IApplicationTypeService, ApplicationTypeService>();
+            builder.Services.AddScoped<IContactInfoService, ContactInfoService>();
+            builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
 
             builder.Services.AddScoped<ITokenService, TokenService>();
 

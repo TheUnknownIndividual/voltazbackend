@@ -8,6 +8,7 @@ using Volt.Application.Dtos;
 using Volt.Application.Interfaces;
 using Volt.Domain.Common;
 using Volt.Domain.Entities;
+using Volt.Domain.Enums;
 using Volt.Domain.Interfaces;
 
 namespace Volt.Application.Services
@@ -21,7 +22,7 @@ namespace Volt.Application.Services
             _uow = uow;
         }
 
-        public async Task<ApiResponse<StepDto>> CreateAsync(StepCreateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<StepDto>> CreateAsync(StepCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var validationError = ValidateRequest(request.Languages, request.ImagePath);
             if (validationError is not null)
@@ -57,7 +58,7 @@ namespace Volt.Application.Services
 
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildStepDtoAsync(step.Id, ct);
+                var dto = await BuildStepDtoAsync(step.Id, languageCode, ct);
                 return ApiResponse<StepDto>.SuccessResponse(dto);
             }
             catch
@@ -68,7 +69,7 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<IReadOnlyList<StepDto>>> GetAllAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<StepDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var steps = await _uow.Repository<Step>().ListNoTrackingAsync( x=> x.IsActive, ct);
             var languages = await _uow.Repository<StepLanguage>().ListNoTrackingAsync(ct);
@@ -77,13 +78,14 @@ namespace Volt.Application.Services
                 .OrderBy(x => x.Position)
                 .Select(x => MapToStepDto(
                     x,
-                    languages.Where(l => l.StepId == x.Id).OrderBy(l => l.Id).ToList()))
+                    languages.Where(l => l.StepId == x.Id).OrderBy(l => l.Id).ToList(),
+                    languageCode))
                 .ToList();
 
             return ApiResponse<IReadOnlyList<StepDto>>.SuccessResponse(result);
         }
 
-        public async Task<ApiResponse<StepDto>> GetByIdAsync(int id, CancellationToken ct = default)
+        public async Task<ApiResponse<StepDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var step = await _uow.Repository<Step>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
 
@@ -93,11 +95,11 @@ namespace Volt.Application.Services
                     ErrorCode.STEP_NOT_FOUND,"Step not found");
             }
 
-            var dto = await BuildStepDtoAsync(id, ct);
+            var dto = await BuildStepDtoAsync(id, languageCode, ct);
             return ApiResponse<StepDto>.SuccessResponse(dto);
         }
 
-        public async Task<ApiResponse<StepDto>> UpdateAsync(int id, StepUpdateRequest request, CancellationToken ct = default)
+        public async Task<ApiResponse<StepDto>> UpdateAsync(int id, StepUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var stepRepo = _uow.Repository<Step>();
             var step = await stepRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
@@ -126,7 +128,7 @@ namespace Volt.Application.Services
                 await UpsertLanguagesAsync(id, request.Languages, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildStepDtoAsync(id, ct);
+                var dto = await BuildStepDtoAsync(id, languageCode, ct);
                 return ApiResponse<StepDto>.SuccessResponse(dto);
             }
             catch
@@ -305,16 +307,20 @@ namespace Volt.Application.Services
             }
         }
 
-        private async Task<StepDto> BuildStepDtoAsync(int stepId, CancellationToken ct)
+        private async Task<StepDto> BuildStepDtoAsync(int stepId, LanguageCode? languageCode, CancellationToken ct)
         {
             var step = await _uow.Repository<Step>().FirstOrDefaultNoTrackingAsync(x => x.Id == stepId, ct);
             var languages = await _uow.Repository<StepLanguage>().ListNoTrackingAsync(x => x.StepId == stepId, ct);
 
-            return MapToStepDto(step, languages.OrderBy(x => x.Id).ToList());
+            return MapToStepDto(step, languages.OrderBy(x => x.Id).ToList(), languageCode);
         }
 
-        private StepDto MapToStepDto(Step step, IEnumerable<StepLanguage> languages)
+        private StepDto MapToStepDto(Step step, IEnumerable<StepLanguage> languages, LanguageCode? languageCode)
         {
+            var filteredLanguages = languageCode is null
+                ? languages
+                : languages.Where(x => x.LanguageCode == languageCode);
+
             return new StepDto(
                 step.Id,
                 step.ImagePath,
@@ -322,7 +328,7 @@ namespace Volt.Application.Services
                 step.IsActive,
                 step.CreatedAt,
                 step.UpdatedAt,
-                languages.Select(x => new StepLanguageDto(
+                filteredLanguages.Select(x => new StepLanguageDto(
                     x.Id,
                     x.LanguageCode,
                     x.Title,
