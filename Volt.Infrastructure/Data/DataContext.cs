@@ -27,6 +27,15 @@ namespace Volt.Infrastructure.Data
         public DbSet<ContactLanguage> ContactLanguages { get; set; }
         public DbSet<PhoneNumber> PhoneNumbers { get; set; }
         public DbSet<EmailAddress> EmailAddresses { get; set; }
+        public DbSet<ServiceRequest> ServiceRequests { get; set; }
+        public DbSet<ContactRequst> ContactRequsts { get; set; }
+        public DbSet<Blog> Blogs { get; set; }
+        public DbSet<BlogTranslation> BlogTranslations { get; set; }
+        public DbSet<NewsPost> NewsPosts { get; set; }
+        public DbSet<NewsPostLanguage> NewsPostLanguages { get; set; }
+        public DbSet<Project> Projects { get; set; }
+        public DbSet<ProjectLanguage> ProjectLanguages { get; set; }
+        public DbSet<ProjectImage> ProjectImages { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

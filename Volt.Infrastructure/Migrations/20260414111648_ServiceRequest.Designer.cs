@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volt.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Volt.Infrastructure.Data;
 namespace Volt.Infrastructure.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260414111648_ServiceRequest")]
+    partial class ServiceRequest
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -204,76 +207,6 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("ApplicationTypeLanguages", (string)null);
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.Blog", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CoverImagePath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Blogs", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.BlogTranslation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("BlogId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("LanguageCode")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BlogId", "LanguageCode")
-                        .IsUnique();
-
-                    b.ToTable("BlogTranslations", (string)null);
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.ContactInfo", b =>
                 {
                     b.Property<int>("Id")
@@ -317,62 +250,6 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("ContactLanguages", (string)null);
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.ContactRequst", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ApplicationTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<byte>("Status")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
-                        .HasDefaultValue((byte)1);
-
-                    b.Property<string>("Surname")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationTypeId");
-
-                    b.ToTable("Applications", (string)null);
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.EmailAddress", b =>
                 {
                     b.Property<int>("Id")
@@ -396,86 +273,6 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("EmailAddresses", (string)null);
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.NewsPost", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("CoverImagePath")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("PostLink")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("NewsPosts", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.NewsPostLanguage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("LanguageCode")
-                        .HasColumnType("int");
-
-                    b.Property<int>("NewsPostId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NewsPostId", "LanguageCode")
-                        .IsUnique();
-
-                    b.ToTable("NewsPostLanguages", (string)null);
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.PhoneNumber", b =>
                 {
                     b.Property<int>("Id")
@@ -497,96 +294,6 @@ namespace Volt.Infrastructure.Migrations
                     b.HasIndex("ContactInfoId");
 
                     b.ToTable("PhoneNumbers", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.Project", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("Position")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Projects", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ProjectImage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ImagePath")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId");
-
-                    b.ToTable("ProjectImages", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ProjectLanguage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("LanguageCode")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProjectId", "LanguageCode")
-                        .IsUnique();
-
-                    b.ToTable("ProjectLanguages", (string)null);
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ServiceManagement", b =>
@@ -700,10 +407,10 @@ namespace Volt.Infrastructure.Migrations
                     b.Property<int>("ServiceManagementId")
                         .HasColumnType("int");
 
-                    b.Property<byte>("Status")
+                    b.Property<int>("Status")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
-                        .HasDefaultValue((byte)1);
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
 
                     b.Property<string>("Surname")
                         .IsRequired()
@@ -830,17 +537,6 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("ApplicationType");
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.BlogTranslation", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.Blog", "Blog")
-                        .WithMany("Translations")
-                        .HasForeignKey("BlogId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Blog");
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.ContactLanguage", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.ContactInfo", "ContactInfo")
@@ -850,17 +546,6 @@ namespace Volt.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ContactInfo");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ContactRequst", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.ApplicationType", "ApplicationType")
-                        .WithMany("ContactRequsts")
-                        .HasForeignKey("ApplicationTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ApplicationType");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.EmailAddress", b =>
@@ -874,17 +559,6 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("ContactInfo");
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.NewsPostLanguage", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.NewsPost", "NewsPost")
-                        .WithMany("Languages")
-                        .HasForeignKey("NewsPostId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NewsPost");
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.PhoneNumber", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.ContactInfo", "ContactInfo")
@@ -894,28 +568,6 @@ namespace Volt.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ContactInfo");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ProjectImage", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.Project", "Project")
-                        .WithMany("Images")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ProjectLanguage", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.Project", "Project")
-                        .WithMany("Languages")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ServiceManagementLanguage", b =>
@@ -960,14 +612,7 @@ namespace Volt.Infrastructure.Migrations
 
             modelBuilder.Entity("Volt.Domain.Entities.ApplicationType", b =>
                 {
-                    b.Navigation("ContactRequsts");
-
                     b.Navigation("Languages");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.Blog", b =>
-                {
-                    b.Navigation("Translations");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ContactInfo", b =>
@@ -977,18 +622,6 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("Languages");
 
                     b.Navigation("PhoneNumbers");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.NewsPost", b =>
-                {
-                    b.Navigation("Languages");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.Project", b =>
-                {
-                    b.Navigation("Images");
-
-                    b.Navigation("Languages");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ServiceManagement", b =>

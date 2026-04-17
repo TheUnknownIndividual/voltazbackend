@@ -15,5 +15,6 @@ namespace Volt.Domain.Entities
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public ICollection<ApplicationTypeLanguage> Languages { get; set; } = new List<ApplicationTypeLanguage>();
+        public ICollection<ContactRequst> ContactRequsts { get; set; } = new List<ContactRequst>();
     }
 }

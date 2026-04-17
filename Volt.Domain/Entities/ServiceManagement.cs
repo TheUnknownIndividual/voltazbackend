@@ -18,5 +18,6 @@ namespace Volt.Domain.Entities
         public DateTime? UpdatedAt { get; set; }
 
         public ICollection<ServiceManagementLanguage> Languages { get; set; } = new List<ServiceManagementLanguage>();
+        public ICollection<ServiceRequest> ServiceRequests { get; set; } = new List<ServiceRequest>();
     }
 }

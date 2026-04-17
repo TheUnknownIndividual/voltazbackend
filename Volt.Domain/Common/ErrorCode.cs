@@ -44,5 +44,27 @@ namespace Volt.Domain.Common
         public const string CONTACT_LANGUAGE_DUPLICATE = "Duplicate language exists for contact info";
         public const string INVALID_CONTACT_INFO_REQUEST = "Invalid contact info request";
         public const string CONTACT_CHANNEL_REQUIRED = "At least one phone number or email is required";
+
+        public const string SERVICE_REQUEST_NOT_FOUND = "Service request not found";
+        public const string INVALID_SERVICE_REQUEST_REQUEST = "Invalid service request request";
+        public const string INVALID_STATUS_TRANSITION = "Invalid status transition";
+        public const string INVALID_STATUS_VALUE = "Status must be between 1 and 3";
+
+        public const string CONTACT_REQUST_NOT_FOUND = "Contact requst not found";
+        public const string INVALID_CONTACT_REQUST_REQUEST = "Invalid contact requst request";
+
+        public const string BLOG_NOT_FOUND = "Blog not found";
+        public const string BLOG_LANGUAGE_DUPLICATE = "Duplicate language exists for blog";
+        public const string INVALID_BLOG_REQUEST = "Invalid blog request";
+
+        public const string NEWS_POST_NOT_FOUND = "News post not found";
+        public const string NEWS_POST_LANGUAGE_DUPLICATE = "Duplicate language exists for news post";
+        public const string INVALID_NEWS_POST_REQUEST = "Invalid news post request";
+
+        public const string PROJECT_NOT_FOUND = "Project not found";
+        public const string PROJECT_LANGUAGE_DUPLICATE = "Duplicate language exists for project";
+        public const string PROJECT_IMAGE_NOT_FOUND = "Project image not found";
+        public const string INVALID_PROJECT_REQUEST = "Invalid project request";
+        public const string INVALID_PROJECT_REORDER_REQUEST = "Invalid project reorder request";
     }
 }
