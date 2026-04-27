@@ -10,9 +10,6 @@ namespace Volt.Application.Dtos.About
     public class AboutUpdateRequest
     {
         [Required]
-        public int Position { get; set; }
-
-        [Required]
         [MinLength(1)]
         public List<AboutLanguageUpdateRequest> Languages { get; set; }
 

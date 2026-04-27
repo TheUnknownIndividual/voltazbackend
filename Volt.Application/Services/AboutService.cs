@@ -32,13 +32,11 @@ namespace Volt.Application.Services
 
             try
             {
-                int nextPosition = (await _uow.Repository<About>().MaxAsync(x => x.Position, ct)) + 1;
-
+                
                 var aboutRepo = _uow.Repository<About>();
 
                 var about = new About
                 {
-                    Position = nextPosition,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = null
@@ -83,7 +81,7 @@ namespace Volt.Application.Services
             var images = await _uow.Repository<AboutImage>().ListNoTrackingAsync(ct);
 
             var result = abouts
-                .OrderBy(x => x.Position)
+                .OrderBy(x => x.Id)
                 .Select(x => MapToAboutDto(
                     x,
                     languages.Where(l => l.AboutId == x.Id).OrderBy(l => l.Id).ToList(),
@@ -94,7 +92,7 @@ namespace Volt.Application.Services
             return ApiResponse<IReadOnlyList<AboutDto>>.SuccessResponse(result);
         }
 
-        public async Task<ApiResponse<AboutDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
+        public async Task<ApiResponse<AboutDto>> GetByIdAsync(int id, CancellationToken ct = default)
         {
             var about = await _uow.Repository<About>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
 
@@ -105,7 +103,7 @@ namespace Volt.Application.Services
                     ErrorCode.ABOUT_NOT_FOUND);
             }
 
-            var dto = await BuildAboutDtoAsync(id, languageCode, ct);
+            var dto = await BuildAboutDtoAsync(id, null, ct);
             return ApiResponse<AboutDto>.SuccessResponse(dto);
         }
 
@@ -142,7 +140,6 @@ namespace Volt.Application.Services
 
             try
             {
-                about.Position = request.Position;
                 about.IsActive = request.IsActive;
                 about.UpdatedAt = DateTime.UtcNow;
 
@@ -217,65 +214,6 @@ namespace Volt.Application.Services
                 return ApiResponse<NoContentDto>.ErrorResponse(
                     ErrorCode.SERVER_ERROR,
                     "An error occurred while deleting the about record.");
-            }
-        }
-
-        public async Task<ApiResponse<NoContentDto>> ReorderAsync(List<AboutReorderRequest> request, CancellationToken ct = default)
-        {
-            if (request is null || !request.Any())
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_ABOUT_REORDER_REQUEST,
-                    "Reorder request cannot be empty.");
-            }
-
-            if (request.GroupBy(x => x.Id).Any(g => g.Count() > 1))
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_ABOUT_REORDER_REQUEST,
-                    "Duplicate about ids detected.");
-            }
-
-            if (request.GroupBy(x => x.Position).Any(g => g.Count() > 1))
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_ABOUT_REORDER_REQUEST,
-                    "Duplicate positions detected.");
-            }
-
-            var ids = request.Select(x => x.Id).ToList();
-            var aboutRepo = _uow.Repository<About>();
-            var abouts = await aboutRepo.ListNoTrackingAsync(x => ids.Contains(x.Id), ct);
-
-            if (abouts.Count != ids.Count)
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_ABOUT_REORDER_REQUEST,
-                    "One or more about records were not found.");
-            }
-
-            try
-            {
-                foreach (var item in request)
-                {
-                    var trackedAbout = await aboutRepo.FirstOrDefaultAsync(x => x.Id == item.Id, ct);
-                    if (trackedAbout is not null)
-                    {
-                        trackedAbout.Position = item.Position;
-                        trackedAbout.UpdatedAt = DateTime.UtcNow;
-                        aboutRepo.Update(trackedAbout);
-                    }
-                }
-
-                await _uow.SaveChangesAsync(ct);
-
-                return ApiResponse<NoContentDto>.SuccessResponse(null);
-            }
-            catch
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.SERVER_ERROR,
-                    "An error occurred while reordering about records.");
             }
         }
 
@@ -403,7 +341,6 @@ namespace Volt.Application.Services
 
             return new AboutDto(
                 about.Id,
-                about.Position,
                 about.IsActive,
                 about.CreatedAt,
                 about.UpdatedAt,

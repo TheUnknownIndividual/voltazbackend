@@ -13,9 +13,8 @@ namespace Volt.Application.Interfaces
     {
         Task<ApiResponse<AboutDto>> CreateAsync(AboutCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<IReadOnlyList<AboutDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default);
-        Task<ApiResponse<AboutDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default);
+        Task<ApiResponse<AboutDto>> GetByIdAsync(int id, CancellationToken ct = default);
         Task<ApiResponse<AboutDto>> UpdateAsync(int id, AboutUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default);
-        Task<ApiResponse<NoContentDto>> ReorderAsync(List<AboutReorderRequest> request, CancellationToken ct = default);
     }
 }

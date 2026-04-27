@@ -17,9 +17,6 @@ namespace Volt.Infrastructure.Configuration
 
             builder.HasKey(a => a.Id);
 
-            builder.Property(a => a.Position)
-                .IsRequired();
-
             builder.Property(a => a.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);

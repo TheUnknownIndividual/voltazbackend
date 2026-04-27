@@ -23,7 +23,7 @@ namespace Volt.API.Controllers
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id, CancellationToken ct)
-            => CreateActionResult(await _service.GetByIdAsync(id, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+            => CreateActionResult(await _service.GetByIdAsync(id, ct));
 
         [Authorize]
         [HttpPost]
@@ -40,9 +40,5 @@ namespace Volt.API.Controllers
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
             => CreateActionResult(await _service.DeleteAsync(id, ct));
 
-        [Authorize]
-        [HttpPut("reorder")]
-        public async Task<IActionResult> Reorder([FromBody] List<AboutReorderRequest> request, CancellationToken ct)
-            => CreateActionResult(await _service.ReorderAsync(request, ct));
     }
 }

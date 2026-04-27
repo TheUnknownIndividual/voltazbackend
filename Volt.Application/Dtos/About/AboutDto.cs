@@ -8,7 +8,6 @@ namespace Volt.Application.Dtos.About
 {
     public sealed record AboutDto(
         int Id,
-        int Position,
         bool IsActive,
         DateTime CreatedAt,
         DateTime? UpdatedAt,
