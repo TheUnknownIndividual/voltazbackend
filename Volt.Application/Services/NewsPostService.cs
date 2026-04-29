@@ -16,10 +16,24 @@ namespace Volt.Application.Services
         {
             _uow = uow;
         }
-
-        public async Task<ApiResponse<IReadOnlyList<NewsPostDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<NewsPostDto>>> GetAllAsyncPublic(LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var newsPosts = await _uow.Repository<NewsPost>().ListNoTrackingAsync(x => x.IsActive, ct);
+            var languages = await _uow.Repository<NewsPostLanguage>().ListNoTrackingAsync(ct);
+
+            var result = newsPosts
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => MapToDto(
+                    x,
+                    languages.Where(l => l.NewsPostId == x.Id).OrderBy(l => l.Id).ToList(),
+                    languageCode))
+                .ToList();
+
+            return ApiResponse<IReadOnlyList<NewsPostDto>>.SuccessResponse(result);
+        }
+        public async Task<ApiResponse<IReadOnlyList<NewsPostDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
+        {
+            var newsPosts = await _uow.Repository<NewsPost>().ListNoTrackingAsync(ct);
             var languages = await _uow.Repository<NewsPostLanguage>().ListNoTrackingAsync(ct);
 
             var result = newsPosts
@@ -143,23 +157,10 @@ namespace Volt.Application.Services
 
             try
             {
-                newsPost.IsActive = false;
-                newsPost.UpdatedAt = DateTime.UtcNow;
-                postRepo.Update(newsPost);
-
-                var languageRepo = _uow.Repository<NewsPostLanguage>();
-                var languages = await languageRepo.ListNoTrackingAsync(x => x.NewsPostId == id, ct);
-                foreach (var language in languages)
-                {
-                    var tracked = await languageRepo.FirstOrDefaultAsync(x => x.Id == language.Id, ct);
-                    if (tracked is not null)
-                    {
-                        tracked.IsActive = false;
-                        languageRepo.Update(tracked);
-                    }
-                }
+                postRepo.Remove(newsPost);
 
                 await _uow.SaveChangesAsync(ct);
+
                 return ApiResponse<NoContentDto>.SuccessResponse(null);
             }
             catch
@@ -260,5 +261,7 @@ namespace Volt.Application.Services
                     x.Content,
                     x.IsActive)).ToList());
         }
+
+        
     }
 }

@@ -18,6 +18,9 @@ namespace Volt.API.Controllers
             _service = service;
             _acceptLanguageService = acceptLanguageService;
         }
+        [HttpGet("GetAllForPublic")]
+        public async Task<IActionResult> GetAllForPublic(CancellationToken ct)
+            => CreateActionResult(await _service.GetAllAsync(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [HttpGet]
         public async Task<IActionResult> GetAll(CancellationToken ct)

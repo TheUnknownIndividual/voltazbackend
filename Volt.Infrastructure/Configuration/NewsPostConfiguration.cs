@@ -33,6 +33,11 @@ namespace Volt.Infrastructure.Configuration
 
             builder.Property(x => x.UpdatedAt)
                 .IsRequired(false);
+
+            builder.HasMany(a => a.Languages)
+                .WithOne(ad => ad.NewsPost)
+                .HasForeignKey(ad => ad.NewsPostId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }
