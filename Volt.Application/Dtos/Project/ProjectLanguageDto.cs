@@ -7,6 +7,8 @@ namespace Volt.Application.Dtos.Project
         LanguageCode LanguageCode,
         string Title,
         string Description,
+        string Location1,
+        string Location2,
         bool IsActive
     );
 }

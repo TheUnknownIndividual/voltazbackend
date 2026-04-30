@@ -27,13 +27,16 @@ namespace Volt.Application.Services
 
             try
             {
-                int nextPosition = (await _uow.Repository<Project>().MaxAsync(x => x.Position, ct)) + 1;
-
+                
                 var projectRepo = _uow.Repository<Project>();
                 var project = new Project
                 {
-                    Position = nextPosition,
                     IsActive = true,
+                    TotalPower = request.TotalPower,
+                    PowerType = request.PowerType,
+                    AnnualProduction = request.AnnualProduction,
+                    AnnualProductionType = request.AnnualProductionType,
+                    SystemType = request.SystemType,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = null
                 };
@@ -49,6 +52,8 @@ namespace Volt.Application.Services
                         LanguageCode = item.LanguageCode,
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
+                        Location1 = item.Location1?.Trim(),
+                        Location2 = item.Location2?.Trim(),
                         IsActive = true
                     }, ct);
                 }
@@ -74,7 +79,7 @@ namespace Volt.Application.Services
             var images = await _uow.Repository<ProjectImage>().ListNoTrackingAsync(ct);
 
             var result = projects
-                .OrderBy(x => x.Position)
+                .OrderBy(x => x.Id)
                 .Select(x => MapToProjectDto(
                     x,
                     languages.Where(l => l.ProjectId == x.Id).OrderBy(l => l.Id).ToList(),
@@ -96,7 +101,7 @@ namespace Volt.Application.Services
                     ErrorCode.PROJECT_NOT_FOUND);
             }
 
-            var dto = await BuildProjectDtoAsync(id, languageCode, ct);
+            var dto = await BuildProjectDtoAsync(id, null, ct);
             return ApiResponse<ProjectDto>.SuccessResponse(dto);
         }
 
@@ -133,9 +138,12 @@ namespace Volt.Application.Services
 
             try
             {
-                project.Position = request.Position;
-                project.IsActive = request.IsActive;
                 project.UpdatedAt = DateTime.UtcNow;
+                project.TotalPower = request.TotalPower;
+                project.PowerType = request.PowerType;
+                project.AnnualProduction = request.AnnualProduction;
+                project.AnnualProductionType = request.AnnualProductionType;
+                project.SystemType = request.SystemType;
 
                 projectRepo.Update(project);
 
@@ -159,7 +167,7 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default)
         {
             var projectRepo = _uow.Repository<Project>();
-            var project = await projectRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var project = await projectRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive == true, ct);
 
             if (project is null)
             {
@@ -210,63 +218,6 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<NoContentDto>> ReorderAsync(List<ProjectReorderRequest> request, CancellationToken ct = default)
-        {
-            if (request is null || !request.Any())
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_PROJECT_REORDER_REQUEST,
-                    "Reorder request cannot be empty.");
-            }
-
-            if (request.GroupBy(x => x.Id).Any(g => g.Count() > 1))
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_PROJECT_REORDER_REQUEST,
-                    "Duplicate project ids detected.");
-            }
-
-            if (request.GroupBy(x => x.Position).Any(g => g.Count() > 1))
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_PROJECT_REORDER_REQUEST,
-                    "Duplicate positions detected.");
-            }
-
-            var ids = request.Select(x => x.Id).ToList();
-            var projectRepo = _uow.Repository<Project>();
-            var projects = await projectRepo.ListNoTrackingAsync(x => ids.Contains(x.Id), ct);
-
-            if (projects.Count != ids.Count)
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_PROJECT_REORDER_REQUEST,
-                    "One or more project records were not found.");
-            }
-
-            try
-            {
-                foreach (var item in request)
-                {
-                    var trackedProject = await projectRepo.FirstOrDefaultAsync(x => x.Id == item.Id, ct);
-                    if (trackedProject is not null)
-                    {
-                        trackedProject.Position = item.Position;
-                        trackedProject.UpdatedAt = DateTime.UtcNow;
-                        projectRepo.Update(trackedProject);
-                    }
-                }
-
-                await _uow.SaveChangesAsync(ct);
-                return ApiResponse<NoContentDto>.SuccessResponse(null);
-            }
-            catch
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.SERVER_ERROR,
-                    "An error occurred while reordering projects.");
-            }
-        }
 
         private string? ValidateLanguages(List<LanguageCode> languages)
         {
@@ -299,6 +250,8 @@ namespace Volt.Application.Services
                         LanguageCode = item.LanguageCode,
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
+                        Location1 = item.Location1?.Trim(),
+                        Location2 = item.Location2?.Trim(),
                         IsActive = item.IsActive
                     }, ct);
                 }
@@ -309,6 +262,8 @@ namespace Volt.Application.Services
                     {
                         trackedLanguage.Title = item.Title.Trim();
                         trackedLanguage.Description = item.Description.Trim();
+                        trackedLanguage.Location1 = item.Location1?.Trim();
+                        trackedLanguage.Location2 = item.Location2?.Trim();
                         trackedLanguage.IsActive = item.IsActive;
                         languageRepo.Update(trackedLanguage);
                     }
@@ -387,15 +342,21 @@ namespace Volt.Application.Services
 
             return new ProjectDto(
                 project.Id,
-                project.Position,
                 project.IsActive,
                 project.CreatedAt,
                 project.UpdatedAt,
+                project.TotalPower,
+                project.PowerType,
+                project.AnnualProduction,
+                project.AnnualProductionType,
+                project.SystemType,
                 filteredLanguages.Select(x => new ProjectLanguageDto(
                     x.Id,
                     x.LanguageCode,
                     x.Title,
                     x.Description,
+                    x.Location1,
+                    x.Location2,
                     x.IsActive)).ToList(),
                 images.Select(x => new ProjectImageDto(
                     x.Id,

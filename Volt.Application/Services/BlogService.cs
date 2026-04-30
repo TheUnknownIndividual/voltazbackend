@@ -41,7 +41,7 @@ namespace Volt.Application.Services
                 return ApiResponse<BlogDto>.ErrorResponse(ErrorCode.BLOG_NOT_FOUND, ErrorCode.BLOG_NOT_FOUND);
             }
 
-            var dto = await BuildDtoAsync(id, languageCode, ct);
+            var dto = await BuildDtoAsync(id, null, ct);
             return ApiResponse<BlogDto>.SuccessResponse(dto);
         }
 

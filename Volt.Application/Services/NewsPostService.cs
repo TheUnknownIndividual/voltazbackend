@@ -49,13 +49,13 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<NewsPostDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
-            var newsPost = await _uow.Repository<NewsPost>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
+            var newsPost = await _uow.Repository<NewsPost>().FirstOrDefaultNoTrackingAsync(x => x.Id == id , ct);
             if (newsPost is null)
             {
                 return ApiResponse<NewsPostDto>.ErrorResponse(ErrorCode.NEWS_POST_NOT_FOUND, ErrorCode.NEWS_POST_NOT_FOUND);
             }
 
-            var dto = await BuildDtoAsync(id, languageCode, ct);
+            var dto = await BuildDtoAsync(id, null, ct);
             return ApiResponse<NewsPostDto>.SuccessResponse(dto);
         }
 
@@ -111,7 +111,7 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<NewsPostDto>> UpdateAsync(int id, NewsPostUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var postRepo = _uow.Repository<NewsPost>();
-            var newsPost = await postRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
+            var newsPost = await postRepo.FirstOrDefaultAsync(x => x.Id == id , ct);
             if (newsPost is null)
             {
                 return ApiResponse<NewsPostDto>.ErrorResponse(ErrorCode.NEWS_POST_NOT_FOUND, ErrorCode.NEWS_POST_NOT_FOUND);

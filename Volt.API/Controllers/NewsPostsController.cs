@@ -20,7 +20,7 @@ namespace Volt.API.Controllers
         }
         [HttpGet("GetAllForPublic")]
         public async Task<IActionResult> GetAllForPublic(CancellationToken ct)
-            => CreateActionResult(await _service.GetAllAsync(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+            => CreateActionResult(await _service.GetAllAsyncPublic(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [HttpGet]
         public async Task<IActionResult> GetAll(CancellationToken ct)

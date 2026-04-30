@@ -40,9 +40,5 @@ namespace Volt.API.Controllers
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
             => CreateActionResult(await _service.DeleteAsync(id, ct));
 
-        [Authorize]
-        [HttpPut("reorder")]
-        public async Task<IActionResult> Reorder([FromBody] List<ProjectReorderRequest> request, CancellationToken ct)
-            => CreateActionResult(await _service.ReorderAsync(request, ct));
     }
 }
