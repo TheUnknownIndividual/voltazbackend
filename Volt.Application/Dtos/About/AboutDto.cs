@@ -8,10 +8,10 @@ namespace Volt.Application.Dtos.About
 {
     public sealed record AboutDto(
         int Id,
+        string ImagePath,
         bool IsActive,
         DateTime CreatedAt,
         DateTime? UpdatedAt,
-        IReadOnlyList<AboutLanguageDto> Languages,
-        IReadOnlyList<AboutImageDto> Images
+        IReadOnlyList<AboutLanguageDto> Languages
     );
 }

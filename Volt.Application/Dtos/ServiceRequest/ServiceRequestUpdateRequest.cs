@@ -31,7 +31,5 @@ namespace Volt.Application.Dtos.ServiceRequest
 
         [Required]
         public int ServiceManagementId { get; set; }
-
-        public bool IsActive { get; set; } = true;
     }
 }

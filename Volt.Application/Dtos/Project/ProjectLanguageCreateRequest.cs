@@ -14,7 +14,6 @@ namespace Volt.Application.Dtos.Project
 
         [Required]
         public string Description { get; set; }
-        public string Location1 { get; set; }
-        public string Location2 { get; set; }
+        public string Location { get; set; }
     }
 }

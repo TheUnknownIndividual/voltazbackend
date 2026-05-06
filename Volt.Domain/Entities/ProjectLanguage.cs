@@ -9,8 +9,7 @@ namespace Volt.Domain.Entities
         public LanguageCode LanguageCode { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
-        public string Location1 { get; set; }
-        public string Location2 { get; set; }
+        public string Location { get; set; }
         public bool IsActive { get; set; }
 
         public Project Project { get; set; }

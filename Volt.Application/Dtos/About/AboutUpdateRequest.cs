@@ -13,8 +13,7 @@ namespace Volt.Application.Dtos.About
         [MinLength(1)]
         public List<AboutLanguageUpdateRequest> Languages { get; set; }
 
-        public List<string>? NewImagePaths { get; set; }
-        public List<int>? DeleteImageIds { get; set; }
+        public string ImagePath { get; set; }
 
         public bool IsActive { get; set; } = true;
     }

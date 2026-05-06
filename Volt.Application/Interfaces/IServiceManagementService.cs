@@ -17,6 +17,5 @@ namespace Volt.Application.Interfaces
         Task<ApiResponse<ServiceManagementDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<ServiceManagementDto>> UpdateAsync(int id, ServiceManagementUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default);
-        Task<ApiResponse<NoContentDto>> ReorderAsync(List<ServiceManagementReorderRequest> request, CancellationToken ct = default);
     }
 }

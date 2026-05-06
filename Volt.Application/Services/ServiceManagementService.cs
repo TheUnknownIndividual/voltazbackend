@@ -24,7 +24,7 @@ namespace Volt.Application.Services
         }
         public async Task<ApiResponse<ServiceManagementDto>> CreateAsync(ServiceManagementCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
-            var validationError = ValidateRequest(request.Languages, request.ImagePath);
+            var validationError = ValidateRequest(request.Languages);
             if (validationError is not null)
             {
                 return ApiResponse<ServiceManagementDto>.ErrorResponse(validationError, validationError);
@@ -32,14 +32,11 @@ namespace Volt.Application.Services
 
             try
             {
-                int nextPosition = (await _uow.Repository<ServiceManagement>().MaxAsync(x => x.Position, ct)) + 1;
-
+               
                 var service = new ServiceManagement
                 {
-                    ImagePath = request.ImagePath,
-                    Position = nextPosition,
                     IsActive = true,
-                    ActiveStatus = true,
+                    Icon = request.Icon,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -54,31 +51,11 @@ namespace Volt.Application.Services
                         LanguageCode = language.LanguageCode,
                         Title = language.Title.Trim(),
                         Description = language.Description.Trim(),
+                        Content1 = language.Content1.Trim(),
+                        Content2 = language.Content2.Trim(),
+                        Content3 = language.Content3.Trim(),
+                        Content4 = language.Content4.Trim(),
                         IsActive = true,
-                    }, ct);
-                }
-
-                await _uow.SaveChangesAsync(ct);
-
-                var appType = new ApplicationType
-                {
-                    ServiceManagementId = service.Id,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = null
-                };
-
-                await _uow.Repository<ApplicationType>().AddAsync(appType, ct);
-                await _uow.SaveChangesAsync(ct);
-
-                foreach (var language in request.Languages)
-                {
-                    await _uow.Repository<ApplicationTypeLanguage>().AddAsync(new ApplicationTypeLanguage
-                    {
-                        ApplicationTypeId = appType.Id,
-                        LanguageCode = language.LanguageCode,
-                        Name = language.Title.Trim(),
-                        IsActive = true
                     }, ct);
                 }
 
@@ -95,11 +72,11 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<IReadOnlyList<ServiceManagementDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
         {
-            var services = await _uow.Repository<ServiceManagement>().ListNoTrackingAsync(x => x.IsActive && x.ActiveStatus, ct);
+            var services = await _uow.Repository<ServiceManagement>().ListNoTrackingAsync(x => x.IsActive, ct);
             var languages = await _uow.Repository<ServiceManagementLanguage>().ListNoTrackingAsync(ct);
 
             var result = services
-                .OrderBy(x => x.Position)
+                .OrderBy(x => x.Id)
                 .Select(x => MapToServiceManagementDto(
                     x,
                     languages.Where(l => l.ServiceMagamentId == x.Id).OrderBy(l => l.Id).ToList(),
@@ -119,7 +96,7 @@ namespace Volt.Application.Services
                 return ApiResponse<ServiceManagementDto>.ErrorResponse(ErrorCode.SERVICE_NOT_FOUND, "Service not found");
             }
 
-            var dto = await BuildServiceDtoAsync(service.Id, languageCode, ct);
+            var dto = await BuildServiceDtoAsync(service.Id, null, ct);
             return ApiResponse<ServiceManagementDto>.SuccessResponse(dto);
         }
 
@@ -133,7 +110,7 @@ namespace Volt.Application.Services
                 return ApiResponse<ServiceManagementDto>.ErrorResponse(ErrorCode.SERVICE_NOT_FOUND, "Service not found");
             }
 
-            var validationError = ValidateRequest(request.Languages, request.ImagePath);
+            var validationError = ValidateRequest(request.Languages);
 
             if (validationError is not null)
             {
@@ -142,10 +119,9 @@ namespace Volt.Application.Services
 
             try
             {
-                service.ImagePath = request.ImagePath.Trim();
-                service.Position = request.Position;
-                service.IsActive = request.IsActive;
+                
                 service.UpdatedAt = DateTime.UtcNow;
+                service.Icon = request.Icon;
 
                 serviceRepo.Update(service);
 
@@ -201,65 +177,7 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<NoContentDto>> ReorderAsync(List<ServiceManagementReorderRequest> request, CancellationToken ct = default)
-        {
-            if (request is null || !request.Any())
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_SERVICE_REORDER_REQUEST,
-                    "Reorder request cannot be empty.");
-            }
-
-            if (request.GroupBy(x => x.Id).Any(g => g.Count() > 1))
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_SERVICE_REORDER_REQUEST,
-                    "Duplicate service ids detected.");
-            }
-
-            if (request.GroupBy(x => x.Position).Any(g => g.Count() > 1))
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_SERVICE_REORDER_REQUEST,
-                    "Duplicate positions detected.");
-            }
-
-            var ids = request.Select(x => x.Id).ToList();
-            var serviceRepo = _uow.Repository<ServiceManagement>();
-            var services = await serviceRepo.ListNoTrackingAsync(x => ids.Contains(x.Id), ct);
-
-            if (services.Count != ids.Count)
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.INVALID_SERVICE_REORDER_REQUEST,
-                    "One or more service records were not found.");
-            }
-
-            try
-            {
-                foreach (var item in request)
-                {
-                    var trackedService = await serviceRepo.FirstOrDefaultAsync(x => x.Id == item.Id, ct);
-                    if (trackedService is not null)
-                    {
-                        trackedService.Position = item.Position;
-                        trackedService.UpdatedAt = DateTime.UtcNow;
-                        serviceRepo.Update(trackedService);
-                    }
-                }
-
-                await _uow.SaveChangesAsync(ct);
-
-                return ApiResponse<NoContentDto>.SuccessResponse(null);
-            }
-            catch
-            {
-                return ApiResponse<NoContentDto>.ErrorResponse(
-                    ErrorCode.SERVER_ERROR,
-                    "An error occurred while reordering services.");
-            }
-        }
-        private string? ValidateRequest<TLanguage>(IEnumerable<TLanguage> languages, string imagePath)
+        private string? ValidateRequest<TLanguage>(IEnumerable<TLanguage> languages)
             where TLanguage : class
         {
             if (languages is null || !languages.Any())
@@ -267,11 +185,7 @@ namespace Volt.Application.Services
                 return ErrorCode.INVALID_SERVICE_REQUEST;
             }
 
-            if (string.IsNullOrWhiteSpace(imagePath))
-            {
-                return ErrorCode.SERVICE_IMAGE_REQUIRED;
-            }
-
+           
             var languageCodes = languages
                 .Select(x =>
                 {
@@ -308,6 +222,10 @@ namespace Volt.Application.Services
                         LanguageCode = item.LanguageCode,
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
+                        Content1 = item.Content1.Trim(),
+                        Content2 = item.Content2.Trim(),
+                        Content3 = item.Content3.Trim(),
+                        Content4 = item.Content4.Trim(),
                         IsActive = item.IsActive,
                     }, ct);
                 }
@@ -318,6 +236,10 @@ namespace Volt.Application.Services
                     {
                         trackedLanguage.Title = item.Title.Trim();
                         trackedLanguage.Description = item.Description.Trim();
+                        trackedLanguage.Content1 = item.Content1.Trim();
+                        trackedLanguage.Content2 = item.Content2.Trim();
+                        trackedLanguage.Content3 = item.Content3.Trim();
+                        trackedLanguage.Content4 = item.Content4.Trim();
                         trackedLanguage.IsActive = item.IsActive;
                         languageRepo.Update(trackedLanguage);
                     }
@@ -339,10 +261,8 @@ namespace Volt.Application.Services
 
             return new ServiceManagementDto(
                 service.Id,
-                service.ImagePath,
-                service.Position,
                 service.IsActive,
-                service.ActiveStatus,
+                service.Icon,
                 service.CreatedAt,
                 service.UpdatedAt,
                 filteredLanguages.Select(x => new ServiceManagementLanguageDto(
@@ -350,6 +270,10 @@ namespace Volt.Application.Services
                     x.LanguageCode,
                     x.Title,
                     x.Description,
+                    x.Content1,
+                    x.Content2,
+                    x.Content3,
+                    x.Content4,
                     x.IsActive)).ToList());
         }
     }

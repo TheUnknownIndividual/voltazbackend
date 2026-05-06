@@ -18,16 +18,6 @@ namespace Volt.Infrastructure.Configuration
 
             builder.HasKey(x => x.Id);
 
-            builder.Property(x => x.ImagePath)
-                .IsRequired();
-
-            builder.Property(x => x.Position)
-                .IsRequired();
-
-            builder.Property(x => x.ActiveStatus)
-                .IsRequired()
-                .HasDefaultValue(true);
-
             builder.Property(x => x.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);

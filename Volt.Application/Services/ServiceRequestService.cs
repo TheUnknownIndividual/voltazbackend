@@ -121,7 +121,6 @@ namespace Volt.Application.Services
                 entity.Message = request.Message.Trim();
                 entity.Status = request.Status;
                 entity.ServiceManagementId = request.ServiceManagementId;
-                entity.IsActive = request.IsActive;
                 entity.UpdatedAt = DateTime.UtcNow;
 
                 repo.Update(entity);
@@ -232,7 +231,6 @@ namespace Volt.Application.Services
                 request.Status,
                 request.ServiceManagementId,
                 request.CreatedAt,
-                request.UpdatedAt,
-                request.IsActive);
+                request.UpdatedAt);
     }
 }

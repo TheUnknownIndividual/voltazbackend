@@ -10,9 +10,7 @@ namespace Volt.Application.Dtos.ServiceManagement
 {
     public class ServiceManagementCreateRequest
     {
-        [Required]
-        public string ImagePath { get; set; }
-
+        public string Icon { get; set; }
         [Required]
         [MinLength(1)]
         public List<ServiceManagementLanguageCreateRequest> Languages { get; set; }

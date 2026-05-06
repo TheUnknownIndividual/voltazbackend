@@ -11,5 +11,9 @@ namespace Volt.Application.Dtos.ServiceManagement
         LanguageCode LanguageCode,
         string Title,
         string Description,
+        string Content1,
+        string Content2,
+        string Content3,
+        string Content4,
         bool IsActive);
 }

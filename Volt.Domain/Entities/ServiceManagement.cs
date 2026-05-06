@@ -9,9 +9,7 @@ namespace Volt.Domain.Entities
     public class ServiceManagement
     {
         public int Id { get; set; }
-        public string ImagePath { get; set; }
-        public int Position { get; set; }
-        public bool ActiveStatus { get; set; }
+        public string Icon { get; set; }
         public bool IsActive { get; set; }
 
         public DateTime CreatedAt { get; set; }

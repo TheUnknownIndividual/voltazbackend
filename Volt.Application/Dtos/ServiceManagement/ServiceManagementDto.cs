@@ -8,10 +8,8 @@ using Volt.Application.Dtos.Step;
 namespace Volt.Application.Dtos.ServiceManagement
 {
     public record ServiceManagementDto(int Id,
-        string ImagePath,
-        int Position,
-        bool ActiveStatus,
         bool IsActive,
+        string Icon,
         DateTime CreatedAt,
         DateTime? UpdatedAt,
         IReadOnlyList<ServiceManagementLanguageDto> Languages);

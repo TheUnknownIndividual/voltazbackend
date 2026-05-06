@@ -39,6 +39,7 @@ namespace Volt.Application.Services
                 {
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
+                    ImagePath = request.ImagePath,
                     UpdatedAt = null
                 };
 
@@ -59,8 +60,6 @@ namespace Volt.Application.Services
                     await _uow.Repository<AboutLanguage>().AddAsync(language, ct);
                 }
 
-                await CreateImagesAsync(about.Id, request.ImagePaths, ct);
-
                 await _uow.SaveChangesAsync(ct);
 
                 var dto = await BuildAboutDtoAsync(about.Id, languageCode, ct);
@@ -78,14 +77,12 @@ namespace Volt.Application.Services
         {
             var abouts = await _uow.Repository<About>().ListNoTrackingAsync(x=> x.IsActive , ct);
             var languages = await _uow.Repository<AboutLanguage>().ListNoTrackingAsync(ct);
-            var images = await _uow.Repository<AboutImage>().ListNoTrackingAsync(ct);
 
             var result = abouts
                 .OrderBy(x => x.Id)
                 .Select(x => MapToAboutDto(
                     x,
                     languages.Where(l => l.AboutId == x.Id).OrderBy(l => l.Id).ToList(),
-                    images.Where(i => i.AboutId == x.Id).OrderBy(i => i.Id).ToList(),
                     languageCode))
                 .ToList();
 
@@ -125,29 +122,17 @@ namespace Volt.Application.Services
                 return ApiResponse<AboutDto>.ErrorResponse(languageValidation, languageValidation);
             }
 
-            if (request.DeleteImageIds is not null && request.DeleteImageIds.Any())
-            {
-                var matchedImages = await _uow.Repository<AboutImage>()
-                    .ListNoTrackingAsync(x => x.AboutId == id && request.DeleteImageIds.Contains(x.Id), ct);
-
-                if (matchedImages.Count != request.DeleteImageIds.Count)
-                {
-                    return ApiResponse<AboutDto>.ErrorResponse(
-                        ErrorCode.ABOUT_IMAGE_NOT_FOUND,
-                        "One or more images were not found for this about.");
-                }
-            }
+            
 
             try
             {
                 about.IsActive = request.IsActive;
+                about.ImagePath = request.ImagePath;
                 about.UpdatedAt = DateTime.UtcNow;
 
                 aboutRepo.Update(about);
 
                 await UpsertLanguagesAsync(id, request.Languages, ct);
-                await SoftDeleteImagesAsync(id, request.DeleteImageIds, ct);
-                await CreateImagesAsync(id, request.NewImagePaths, ct);
 
                 await _uow.SaveChangesAsync(ct);
 
@@ -181,8 +166,7 @@ namespace Volt.Application.Services
                 aboutRepo.Update(about);
 
                 var languageRepo = _uow.Repository<AboutLanguage>();
-                var imageRepo = _uow.Repository<AboutImage>();
-
+                
                 var languages = await languageRepo.ListNoTrackingAsync(x => x.AboutId == id, ct);
                 foreach (var language in languages)
                 {
@@ -191,17 +175,6 @@ namespace Volt.Application.Services
                     {
                         trackedLanguage.IsActive = false;
                         languageRepo.Update(trackedLanguage);
-                    }
-                }
-
-                var images = await imageRepo.ListNoTrackingAsync(x => x.AboutId == id, ct);
-                foreach (var image in images)
-                {
-                    var trackedImage = await imageRepo.FirstOrDefaultAsync(x => x.Id == image.Id, ct);
-                    if (trackedImage is not null)
-                    {
-                        trackedImage.IsActive = false;
-                        imageRepo.Update(trackedImage);
                     }
                 }
 
@@ -268,71 +241,20 @@ namespace Volt.Application.Services
             }
         }
 
-        private async Task CreateImagesAsync(int aboutId, List<string>? imagePaths, CancellationToken ct)
-        {
-            if (imagePaths is null || !imagePaths.Any())
-            {
-                return;
-            }
-
-            foreach (var imagePath in imagePaths)
-            {
-                if (string.IsNullOrWhiteSpace(imagePath))
-                {
-                    continue;
-                }
-
-                var aboutImage = new AboutImage
-                {
-                    AboutId = aboutId,
-                    ImagePath = imagePath.Trim(),
-                    IsActive = true
-                };
-
-                await _uow.Repository<AboutImage>().AddAsync(aboutImage, ct);
-            }
-        }
-
-        private async Task SoftDeleteImagesAsync(int aboutId, List<int>? deleteImageIds, CancellationToken ct)
-        {
-            if (deleteImageIds is null || !deleteImageIds.Any())
-            {
-                return;
-            }
-
-            var imageRepo = _uow.Repository<AboutImage>();
-            var images = await imageRepo.ListNoTrackingAsync(
-                x => x.AboutId == aboutId && deleteImageIds.Contains(x.Id),
-                ct);
-
-            foreach (var image in images)
-            {
-                var trackedImage = await imageRepo.FirstOrDefaultAsync(x => x.Id == image.Id, ct);
-                if (trackedImage is not null)
-                {
-                    trackedImage.IsActive = false;
-                    imageRepo.Update(trackedImage);
-                }
-            }
-        }
-
         private async Task<AboutDto> BuildAboutDtoAsync(int aboutId, LanguageCode? languageCode, CancellationToken ct)
         {
             var about = await _uow.Repository<About>().FirstOrDefaultNoTrackingAsync(x => x.Id == aboutId, ct);
             var languages = await _uow.Repository<AboutLanguage>().ListNoTrackingAsync(x => x.AboutId == aboutId, ct);
-            var images = await _uow.Repository<AboutImage>().ListNoTrackingAsync(x => x.AboutId == aboutId, ct);
 
             return MapToAboutDto(
                 about,
                 languages.OrderBy(x => x.Id).ToList(),
-                images.OrderBy(x => x.Id).ToList(),
                 languageCode);
         }
 
         private AboutDto MapToAboutDto(
             About about,
             IEnumerable<AboutLanguage> languages,
-            IEnumerable<AboutImage> images,
             LanguageCode? languageCode)
         {
             var filteredLanguages = languageCode is null
@@ -341,6 +263,7 @@ namespace Volt.Application.Services
 
             return new AboutDto(
                 about.Id,
+                about.ImagePath,
                 about.IsActive,
                 about.CreatedAt,
                 about.UpdatedAt,
@@ -349,11 +272,8 @@ namespace Volt.Application.Services
                     x.LanguageCode,
                     x.Title,
                     x.Description,
-                    x.IsActive)).ToList(),
-                images.Select(x => new AboutImageDto(
-                    x.Id,
-                    x.ImagePath,
-                    x.IsActive)).ToList());
+                    x.IsActive)).ToList()
+                    .ToList());
         }
     }
 }

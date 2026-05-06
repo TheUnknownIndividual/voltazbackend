@@ -32,10 +32,6 @@ namespace Volt.Infrastructure.Configuration
                 .HasForeignKey(ad => ad.AboutId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            builder.HasMany(a => a.Images)
-                .WithOne(ai => ai.About)
-                .HasForeignKey(ai => ai.AboutId)
-                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

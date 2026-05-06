@@ -52,8 +52,7 @@ namespace Volt.Application.Services
                         LanguageCode = item.LanguageCode,
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
-                        Location1 = item.Location1?.Trim(),
-                        Location2 = item.Location2?.Trim(),
+                        Location = item.Location?.Trim(),
                         IsActive = true
                     }, ct);
                 }
@@ -250,8 +249,7 @@ namespace Volt.Application.Services
                         LanguageCode = item.LanguageCode,
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
-                        Location1 = item.Location1?.Trim(),
-                        Location2 = item.Location2?.Trim(),
+                        Location = item.Location?.Trim(),
                         IsActive = item.IsActive
                     }, ct);
                 }
@@ -262,8 +260,7 @@ namespace Volt.Application.Services
                     {
                         trackedLanguage.Title = item.Title.Trim();
                         trackedLanguage.Description = item.Description.Trim();
-                        trackedLanguage.Location1 = item.Location1?.Trim();
-                        trackedLanguage.Location2 = item.Location2?.Trim();
+                        trackedLanguage.Location = item.Location?.Trim();
                         trackedLanguage.IsActive = item.IsActive;
                         languageRepo.Update(trackedLanguage);
                     }
@@ -355,8 +352,7 @@ namespace Volt.Application.Services
                     x.LanguageCode,
                     x.Title,
                     x.Description,
-                    x.Location1,
-                    x.Location2,
+                    x.Location,
                     x.IsActive)).ToList(),
                 images.Select(x => new ProjectImageDto(
                     x.Id,

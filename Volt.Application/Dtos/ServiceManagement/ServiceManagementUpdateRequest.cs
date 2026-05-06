@@ -12,14 +12,9 @@ namespace Volt.Application.Dtos.ServiceManagement
     {
 
         [Required]
-        public string ImagePath { get; set; }
-
-        [Required]
-        public int Position { get; set; }
-
-        [Required]
         [MinLength(1)]
         public List<ServiceManagementLanguageUpdateRequest> Languages { get; set; }
+        public string Icon { get; set; }
 
         public bool IsActive { get; set; } = true;
     }

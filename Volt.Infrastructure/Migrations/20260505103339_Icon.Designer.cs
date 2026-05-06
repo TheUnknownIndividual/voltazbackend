@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volt.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Volt.Infrastructure.Data;
 namespace Volt.Infrastructure.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260505103339_Icon")]
+    partial class Icon
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33,9 +36,6 @@ namespace Volt.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ImagePath")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -47,6 +47,33 @@ namespace Volt.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Abouts", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.AboutImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AboutId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ImagePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AboutId");
+
+                    b.ToTable("AboutImages", (string)null);
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.AboutLanguage", b =>
@@ -778,6 +805,17 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("StepLanguages", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.AboutImage", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.About", "About")
+                        .WithMany("Images")
+                        .HasForeignKey("AboutId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("About");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.AboutLanguage", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.About", "About")
@@ -933,6 +971,8 @@ namespace Volt.Infrastructure.Migrations
 
             modelBuilder.Entity("Volt.Domain.Entities.About", b =>
                 {
+                    b.Navigation("Images");
+
                     b.Navigation("Languages");
                 });
 

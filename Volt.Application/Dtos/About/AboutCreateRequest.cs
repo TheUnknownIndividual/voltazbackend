@@ -12,7 +12,6 @@ namespace Volt.Application.Dtos.About
         [Required]
         [MinLength(1)]
         public List<AboutLanguageCreateRequest> Languages { get; set; }
-
-        public List<string>? ImagePaths { get; set; }
+        public string ImagePath { get; set; }
     }
 }

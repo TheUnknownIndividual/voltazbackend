@@ -14,6 +14,10 @@ namespace Volt.Domain.Entities
         public LanguageCode LanguageCode { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }
+        public string Content1 { get; set; }
+        public string Content2 { get; set; }
+        public string Content3 { get; set; }
+        public string Content4 { get; set; }
         public bool IsActive { get; set; }
 
         public ServiceManagement ServiceManagement { get; set; }
