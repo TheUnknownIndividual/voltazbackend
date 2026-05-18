@@ -17,7 +17,7 @@ namespace Volt.API.Controllers
             _service = service;
         }
 
-        [Authorize]
+       // [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] byte? status, CancellationToken ct)
             => CreateActionResult(await _service.GetAllAsync(status, ct));

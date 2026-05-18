@@ -35,6 +35,12 @@ namespace Volt.Infrastructure.Data
         public DbSet<Project> Projects { get; set; }
         public DbSet<ProjectLanguage> ProjectLanguages { get; set; }
         public DbSet<ProjectImage> ProjectImages { get; set; }
+        public DbSet<ProductCategory> ProductCategories { get; set; }
+        public DbSet<ProductCategoryLanguage> ProductCategoryLanguages { get; set; }
+        public DbSet<ProductSubCategory> ProductSubCategories { get; set; }
+        public DbSet<ProductSubCategoryLanguage> ProductSubCategoryLanguages { get; set; }
+        public DbSet<Promotion> Promotions { get; set; }
+        public DbSet<PromotionLanguage> PromotionLanguages { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

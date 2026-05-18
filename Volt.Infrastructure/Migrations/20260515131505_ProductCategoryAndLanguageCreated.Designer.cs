@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volt.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Volt.Infrastructure.Data;
 namespace Volt.Infrastructure.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260515131505_ProductCategoryAndLanguageCreated")]
+    partial class ProductCategoryAndLanguageCreated
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -522,56 +525,6 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("ProductCategoryLanguages", (string)null);
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ProductSubCategories", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategoryLanguage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("LanguageCode")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProductSubCategoryId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("SubCategoryName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductSubCategoryId", "LanguageCode")
-                        .IsUnique();
-
-                    b.ToTable("ProductSubCategoryLanguages", (string)null);
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.Project", b =>
                 {
                     b.Property<int>("Id")
@@ -987,17 +940,6 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("ProductCategory");
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategoryLanguage", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.ProductSubCategory", "ProductSubCategory")
-                        .WithMany("Languages")
-                        .HasForeignKey("ProductSubCategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ProductSubCategory");
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.ProjectImage", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.Project", "Project")
@@ -1085,11 +1027,6 @@ namespace Volt.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ProductCategory", b =>
-                {
-                    b.Navigation("Languages");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategory", b =>
                 {
                     b.Navigation("Languages");
                 });

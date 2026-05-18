@@ -66,5 +66,20 @@ namespace Volt.Domain.Common
         public const string PROJECT_IMAGE_NOT_FOUND = "Project image not found";
         public const string INVALID_PROJECT_REQUEST = "Invalid project request";
         public const string INVALID_PROJECT_REORDER_REQUEST = "Invalid project reorder request";
+
+        public const string PRODUCT_CATEGORY_NOT_FOUND = "Product category not found";
+        public const string PRODUCT_CATEGORY_LANGUAGE_DUPLICATE = "Duplicate language exists for product category";
+        public const string INVALID_PRODUCT_CATEGORY_REQUEST = "Invalid product category request";
+
+
+        public const string PRODUCT_SUBCATEGORY_NOT_FOUND = "Product subcategory not found";
+        public const string PRODUCT_SUBCATEGORY_LANGUAGE_DUPLICATE = "Duplicate language exists for product subcategory";
+        public const string INVALID_PRODUCT_SUBCATEGORY_REQUEST = "Invalid product subcategory request";
+
+        public const string PROMOTION_NOT_FOUND = "Promotion not found";
+        public const string PROMOTION_LANGUAGE_DUPLICATE = "Duplicate language exists for promotion";
+        public const string INVALID_PROMOTION_REQUEST = "Invalid promotion request";
+
+
     }
 }

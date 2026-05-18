@@ -53,6 +53,8 @@ namespace Volt.API
             builder.Services.AddScoped<INewsPostService, NewsPostService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
+            builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
+            builder.Services.AddScoped<IProductSubCategoryService, ProductSubCategoryService>();
 
             builder.Services.AddScoped<ITokenService, TokenService>();
 
