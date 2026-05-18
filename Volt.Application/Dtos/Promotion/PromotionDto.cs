@@ -6,7 +6,5 @@ using System.Threading.Tasks;
 
 namespace Volt.Application.Dtos.Promotion
 {
-    internal class PromotionDto
-    {
-    }
+    public sealed record PromotionDto( IReadOnlyList<PromotionLanguageDto> Languages);
 }
