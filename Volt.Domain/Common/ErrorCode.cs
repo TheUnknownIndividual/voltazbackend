@@ -23,6 +23,7 @@ namespace Volt.Domain.Common
 
         public const string FILE_REQUIRED = "File is required";
         public const string FILE_URL_REQUIRED = "File url is required";
+        public const string INVALID_FILE_EXTENSION = "Invalid file extension";
 
         public const string STEP_NOT_FOUND = "Step not found";
         public const string STEP_LANGUAGE_DUPLICATE = "Duplicate language exists for step";
@@ -80,6 +81,15 @@ namespace Volt.Domain.Common
         public const string PROMOTION_LANGUAGE_DUPLICATE = "Duplicate language exists for promotion";
         public const string INVALID_PROMOTION_REQUEST = "Invalid promotion request";
 
+        public const string PRODUCT_BRAND_NOT_FOUND = "Product brand not found";
+        public const string INVALID_PRODUCT_BRAND_REQUEST = "Invalid product brand request";
+
+        public const string PRODUCT_TECHNOLOGY_NOT_FOUND = "Product technology not found";
+        public const string INVALID_PRODUCT_TECHNOLOGY_REQUEST = "Invalid product technology request";
+        public const string PRODUCT_NOT_FOUND = "Product not found";
+        public const string INVALID_PRODUCT_REQUEST = "Invalid product request";
+        public const string PRODUCT_PROMOTION_CONFLICT = "Promotion is already assigned to another product";
+        public const string PRODUCT_DESCRIPTION_LANGUAGE_DUPLICATE = "Duplicate language exists for product description";
 
     }
 }

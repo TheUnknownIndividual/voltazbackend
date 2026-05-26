@@ -12,10 +12,10 @@ namespace Volt.API.Controllers
     [ApiController]
     public class PromotionsController : CustomBaseController
     {
-        private readonly IPromotion _service;
+        private readonly IPromotionService _service;
         private readonly IAcceptLanguageService _acceptLanguageService;
 
-        public PromotionsController(IPromotion service, IAcceptLanguageService acceptLanguageService)
+        public PromotionsController(IPromotionService service, IAcceptLanguageService acceptLanguageService)
         {
             _service = service;
             _acceptLanguageService = acceptLanguageService;
@@ -36,7 +36,7 @@ namespace Volt.API.Controllers
 
         [Authorize]
         [HttpPut("{id:int}")]
-        public async Task<IActionResult> Update(int id, [FromBody] PromotionUpdateDto request, CancellationToken ct)
+        public async Task<IActionResult> Update(int id, [FromBody] PromotionUpdateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.UpdateAsync(id, request, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [Authorize]

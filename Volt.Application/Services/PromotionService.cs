@@ -14,7 +14,7 @@ using Volt.Domain.Interfaces;
 
 namespace Volt.Application.Services
 {
-    public class PromotionService : IPromotion
+    public class PromotionService : IPromotionService
     {
         private readonly IUnitOfWork _uow;
 
@@ -32,21 +32,21 @@ namespace Volt.Application.Services
 
             try
             {
-                var PromotionRepo = _uow.Repository<Promotion>();
+                var promotionRepo = _uow.Repository<Promotion>();
 
-                var Promotion = new Promotion
+                var promotion = new Promotion
                 {
                     IsActive = true,
                 };
 
-                await PromotionRepo.AddAsync(Promotion, ct);
+                await promotionRepo.AddAsync(promotion, ct);
                 await _uow.SaveChangesAsync(ct);
 
                 foreach (var item in request.Languages)
                 {
                     var language = new PromotionLanguage
                     {
-                        PromotionId = Promotion.Id,
+                        PromotionId = promotion.Id,
                         LanguageCode = item.LanguageCode,
                         PromotionName = item.PromotionName,
                         IsActive = true
@@ -57,7 +57,7 @@ namespace Volt.Application.Services
 
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildDtoAsync(Promotion.Id, null, ct);
+                var dto = await BuildDtoAsync(promotion.Id, null, ct);
                 return ApiResponse<PromotionDto>.SuccessResponse(dto);
             }
             catch (Exception ex)
@@ -71,8 +71,8 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default)
         {
-            var PromotionRepo = _uow.Repository<Promotion>();
-            var promotion = await PromotionRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var promotionRepo = _uow.Repository<Promotion>();
+            var promotion = await promotionRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
 
             if (promotion is null)
             {
@@ -84,7 +84,7 @@ namespace Volt.Application.Services
             try
             {
                 promotion.IsActive = false;
-                PromotionRepo.Update(promotion);
+                promotionRepo.Update(promotion);
 
                 var languageRepo = _uow.Repository<PromotionLanguage>();
 
@@ -142,7 +142,7 @@ namespace Volt.Application.Services
             return ApiResponse<PromotionDto>.SuccessResponse(dto);
         }
 
-        public async Task<ApiResponse<PromotionDto>> UpdateAsync(int id, PromotionUpdateDto request, LanguageCode? languageCode = null, CancellationToken ct = default)
+        public async Task<ApiResponse<PromotionDto>> UpdateAsync(int id, PromotionUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var promotionRepo = _uow.Repository<Promotion>();
 
@@ -162,7 +162,7 @@ namespace Volt.Application.Services
 
             try
             {
-                await UpsertLanguagesAsync(id, request.Languages, ct);
+                await UpsertLanguagesAsync(id, request.Languages , ct);
 
                 await _uow.SaveChangesAsync(ct);
 
@@ -193,7 +193,7 @@ namespace Volt.Application.Services
 
             return null;
         }
-        private async Task UpsertLanguagesAsync(int promotionId, List<PromotionLanguageUpdateDto> languages, CancellationToken ct)
+        private async Task UpsertLanguagesAsync(int promotionId, List<PromotionLanguageUpdateRequest> languages, CancellationToken ct)
         {
             var languageRepo = _uow.Repository<PromotionLanguage>();
             var existingLanguages = await languageRepo.ListNoTrackingAsync(x => x.PromotionId == promotionId, ct);
@@ -248,6 +248,7 @@ namespace Volt.Application.Services
                 : languages.Where(x => x.LanguageCode == languageCode);
 
             return new PromotionDto(
+                promotion.Id,
                 filteredLanguages.Select(x => new PromotionLanguageDto(
                     x.LanguageCode,
                     x.PromotionName
@@ -255,5 +256,7 @@ namespace Volt.Application.Services
                     .ToList());
 
         }
+
+        
     }
 }

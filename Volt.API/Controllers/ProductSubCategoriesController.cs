@@ -27,8 +27,8 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.CreateAsync(request, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(CancellationToken ct)
-            => CreateActionResult(await _service.GetAllAsync(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+        public async Task<IActionResult> GetAll(int ProductCategoryId, CancellationToken ct)
+            => CreateActionResult(await _service.GetAllAsync( ProductCategoryId ,_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id, CancellationToken ct)

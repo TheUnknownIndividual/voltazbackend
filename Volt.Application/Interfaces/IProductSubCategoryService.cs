@@ -13,7 +13,7 @@ namespace Volt.Application.Interfaces
     public interface IProductSubCategoryService
     {
         Task<ApiResponse<ProductSubCategoryDto>> CreateAsync(ProductSubCategoryCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
-        Task<ApiResponse<IReadOnlyList<ProductSubCategoryDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default);
+        Task<ApiResponse<IReadOnlyList<ProductSubCategoryDto>>> GetAllAsync(int ProductCategoryId , LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<ProductSubCategoryDto>> GetByIdAsync(int id, CancellationToken ct = default);
         Task<ApiResponse<ProductSubCategoryDto>> UpdateAsync(int id, ProductSubCategoryUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default);

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,6 +41,14 @@ namespace Volt.Infrastructure.Data
         public DbSet<ProductSubCategoryLanguage> ProductSubCategoryLanguages { get; set; }
         public DbSet<Promotion> Promotions { get; set; }
         public DbSet<PromotionLanguage> PromotionLanguages { get; set; }
+        public DbSet<ProductBrand> ProductBrands { get; set; }
+        public DbSet<ProductTechnology> ProductTechnologies { get; set; }
+        public DbSet<Product> Products { get; set; }
+        public DbSet<ProductImage> ProductImages { get; set; }
+        public DbSet<ProductParametr> ProductParametrs { get; set; }
+        public DbSet<ProductDescription> ProductDescriptions { get; set; }
+        public DbSet<ProductDescriptionLanguage> ProductDescriptionLanguages { get; set; }
+        public DbSet<ProductPromotion> ProductPromotions { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -472,6 +472,86 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("PhoneNumbers", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.Product", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Certificate")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("InHomePage")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("InStock")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ProductBrandId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ProductSubCategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ProductTechnologyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductBrandId");
+
+                    b.HasIndex("ProductCategoryId");
+
+                    b.HasIndex("ProductSubCategoryId");
+
+                    b.HasIndex("ProductTechnologyId");
+
+                    b.ToTable("Products", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductBrand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ProductCategoryId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductCategoryId");
+
+                    b.ToTable("ProductBrands", (string)null);
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.ProductCategory", b =>
                 {
                     b.Property<int>("Id")
@@ -522,6 +602,137 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("ProductCategoryLanguages", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.ProductDescription", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductDescriptions", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductDescriptionLanguage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Features")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("LanguageCode")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductDescriptionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductDescriptionId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("ProductDescriptionLanguages", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Type")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductImages", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductParametr", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("Amount")
+                        .IsRequired()
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Count")
+                        .IsRequired()
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("Effectiveness")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("TechnicalPower")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductParametrs", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductPromotion", b =>
+                {
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PromotionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ProductId", "PromotionId");
+
+                    b.HasIndex("PromotionId");
+
+                    b.ToTable("ProductPromotions", (string)null);
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategory", b =>
                 {
                     b.Property<int>("Id")
@@ -535,7 +746,12 @@ namespace Volt.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<int>("ProductCategoryId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ProductCategoryId");
 
                     b.ToTable("ProductSubCategories", (string)null);
                 });
@@ -570,6 +786,34 @@ namespace Volt.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProductSubCategoryLanguages", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductTechnology", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ProductCategoryId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductCategoryId");
+
+                    b.ToTable("ProductTechnologies", (string)null);
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.Project", b =>
@@ -675,6 +919,56 @@ namespace Volt.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProjectLanguages", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.Promotion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Promotions", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.PromotionLanguage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("LanguageCode")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PromotionId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PromotionName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PromotionId", "LanguageCode")
+                        .IsUnique();
+
+                    b.ToTable("PromotionLanguages", (string)null);
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ServiceManagement", b =>
@@ -976,10 +1270,129 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("ContactInfo");
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.Product", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.ProductBrand", "ProductBrand")
+                        .WithMany("Products")
+                        .HasForeignKey("ProductBrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Volt.Domain.Entities.ProductCategory", "ProductCategory")
+                        .WithMany("Products")
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Volt.Domain.Entities.ProductSubCategory", "ProductSubCategory")
+                        .WithMany("Products")
+                        .HasForeignKey("ProductSubCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Volt.Domain.Entities.ProductTechnology", "ProductTechnology")
+                        .WithMany("Products")
+                        .HasForeignKey("ProductTechnologyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ProductBrand");
+
+                    b.Navigation("ProductCategory");
+
+                    b.Navigation("ProductSubCategory");
+
+                    b.Navigation("ProductTechnology");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductBrand", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.ProductCategory", "ProductCategory")
+                        .WithMany("Brands")
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductCategory");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.ProductCategoryLanguage", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.ProductCategory", "ProductCategory")
                         .WithMany("Languages")
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductCategory");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductDescription", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.Product", "Product")
+                        .WithMany("ProductDescriptions")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductDescriptionLanguage", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.ProductDescription", "ProductDescription")
+                        .WithMany("Languages")
+                        .HasForeignKey("ProductDescriptionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductDescription");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.Product", "Product")
+                        .WithMany("ProductImages")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductParametr", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.Product", "Product")
+                        .WithMany("ProductParametrs")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductPromotion", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.Product", "Product")
+                        .WithMany("ProductPromotions")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Volt.Domain.Entities.Promotion", "Promotion")
+                        .WithMany("ProductPromotions")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Promotion");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategory", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.ProductCategory", "ProductCategory")
+                        .WithMany("SubCategories")
                         .HasForeignKey("ProductCategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -996,6 +1409,17 @@ namespace Volt.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ProductSubCategory");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductTechnology", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.ProductCategory", "ProductCategory")
+                        .WithMany("Technologies")
+                        .HasForeignKey("ProductCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductCategory");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ProjectImage", b =>
@@ -1018,6 +1442,17 @@ namespace Volt.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.PromotionLanguage", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.Promotion", "Promotion")
+                        .WithMany("Languages")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Promotion");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ServiceManagementLanguage", b =>
@@ -1084,7 +1519,36 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("Languages");
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.Product", b =>
+                {
+                    b.Navigation("ProductDescriptions");
+
+                    b.Navigation("ProductImages");
+
+                    b.Navigation("ProductParametrs");
+
+                    b.Navigation("ProductPromotions");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductBrand", b =>
+                {
+                    b.Navigation("Products");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.ProductCategory", b =>
+                {
+                    b.Navigation("Brands");
+
+                    b.Navigation("Languages");
+
+                    b.Navigation("Products");
+
+                    b.Navigation("SubCategories");
+
+                    b.Navigation("Technologies");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductDescription", b =>
                 {
                     b.Navigation("Languages");
                 });
@@ -1092,6 +1556,13 @@ namespace Volt.Infrastructure.Migrations
             modelBuilder.Entity("Volt.Domain.Entities.ProductSubCategory", b =>
                 {
                     b.Navigation("Languages");
+
+                    b.Navigation("Products");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.ProductTechnology", b =>
+                {
+                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.Project", b =>
@@ -1099,6 +1570,13 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("Images");
 
                     b.Navigation("Languages");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.Promotion", b =>
+                {
+                    b.Navigation("Languages");
+
+                    b.Navigation("ProductPromotions");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.ServiceManagement", b =>

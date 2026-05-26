@@ -36,6 +36,7 @@ namespace Volt.Application.Services
 
                 var productSubCategory = new ProductSubCategory
                 {
+                    ProductCategoryId = request.ProductCategoryId,
                     IsActive = true,
                 };
 
@@ -111,9 +112,12 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<IReadOnlyList<ProductSubCategoryDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<ProductSubCategoryDto>>> GetAllAsync(int ProductCategoryId, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
-            var productSubCategories = await _uow.Repository<ProductSubCategory>().ListNoTrackingAsync(x => x.IsActive, ct);
+            var productSubCategories = await _uow.Repository<ProductSubCategory>().ListNoTrackingAsync(
+                x =>x.ProductCategoryId == ProductCategoryId &&
+                x.IsActive, ct);
+
             var languages = await _uow.Repository<ProductSubCategoryLanguage>().ListNoTrackingAsync(ct);
 
             var results = productSubCategories
@@ -248,6 +252,7 @@ namespace Volt.Application.Services
                 : languages.Where(x => x.LanguageCode == languageCode);
 
             return new ProductSubCategoryDto(
+                productCategory.Id,
                 filteredLanguages.Select(x => new ProductSubCategoryLanguageDto(
                     x.LanguageCode,
                     x.SubCategoryName

@@ -243,6 +243,7 @@ namespace Volt.Application.Services
                 : languages.Where(x => x.LanguageCode == languageCode);
 
             return new ProductCategoryDto(
+                productCategory.Id,
                 filteredLanguages.Select(x => new ProductCategoryLanguageDto(
                     x.LanguageCode,
                     x.CategoryName

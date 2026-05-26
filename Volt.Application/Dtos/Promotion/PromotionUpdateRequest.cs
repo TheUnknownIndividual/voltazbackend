@@ -7,9 +7,9 @@ using Volt.Application.Dtos.ProdcutCategory;
 
 namespace Volt.Application.Dtos.Promotion
 {
-    public class PromotionUpdateDto
+    public class PromotionUpdateRequest
     {
-        public List<PromotionLanguageUpdateDto> Languages { get; set; }
+        public List<PromotionLanguageUpdateRequest> Languages { get; set; }
 
     }
 }

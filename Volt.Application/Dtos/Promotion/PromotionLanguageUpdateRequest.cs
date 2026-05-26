@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -8,7 +9,7 @@ using Volt.Domain.Enums;
 
 namespace Volt.Application.Dtos.Promotion
 {
-    public class PromotionLanguageUpdateDto
+    public class PromotionLanguageUpdateRequest
     {
         [Required]
         public LanguageCode LanguageCode { get; set; }

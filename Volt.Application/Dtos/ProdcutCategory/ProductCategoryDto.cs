@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace Volt.Application.Dtos.ProdcutCategory
 {
     public sealed record ProductCategoryDto(
+        int Id,
         IReadOnlyList<ProductCategoryLanguageDto> Languages
         );
 }

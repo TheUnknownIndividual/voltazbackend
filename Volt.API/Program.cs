@@ -55,6 +55,10 @@ namespace Volt.API
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
             builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
             builder.Services.AddScoped<IProductSubCategoryService, ProductSubCategoryService>();
+            builder.Services.AddScoped<IProductBrandService, ProductBrandService>();
+            builder.Services.AddScoped<IProductTechnologyService, ProductTechnologyService>();
+            builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<IPromotionService, PromotionService>();
 
             builder.Services.AddScoped<ITokenService, TokenService>();
 

@@ -10,6 +10,7 @@ namespace Volt.Application.Interfaces
     public interface IFileService
     {
         Task<string> UploadImageAsync(FileUploadRequest file, string folderName, CancellationToken ct = default);
+        Task<string> UploadPdfAsync(FileUploadRequest file, string folderName, CancellationToken ct = default);
         Task DeleteFileAsync(string fileUrl, CancellationToken ct = default);
     }
 }

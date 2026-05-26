@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
 using System.Collections.Generic;
@@ -20,6 +20,11 @@ namespace Volt.Infrastructure.Configuration
             builder.Property(pc => pc.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);
+
+            builder.HasOne(pc => pc.ProductCategory)
+                .WithMany(pc => pc.SubCategories)
+                .HasForeignKey(pc => pc.ProductCategoryId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasMany(pc => pc.Languages)
                 .WithOne(pcl => pcl.ProductSubCategory)

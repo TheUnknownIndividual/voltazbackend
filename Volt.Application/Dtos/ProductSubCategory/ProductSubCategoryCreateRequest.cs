@@ -11,6 +11,9 @@ namespace Volt.Application.Dtos.ProductSubCategory
     public class ProductSubCategoryCreateRequest
     {
         [Required]
+        public int ProductCategoryId { get; set; }
+
+        [Required]
         [MinLength(1)]
         public List<ProductSubCategoryLanguageCreateRequest> Languages { get; set; }
     }
