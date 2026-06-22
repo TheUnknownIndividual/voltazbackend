@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volt.Infrastructure.Data;
 
@@ -11,9 +12,11 @@ using Volt.Infrastructure.Data;
 namespace Volt.Infrastructure.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260616084951_Decimal")]
+    partial class Decimal
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -442,61 +445,6 @@ namespace Volt.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("NewsPostLanguages", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.PartnershipType", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PartnershipTypes", (string)null);
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.PartnershipTypeLanguage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<int>("LanguageCode")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("PartnershipTypeId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PartnershipTypeId", "LanguageCode")
-                        .IsUnique();
-
-                    b.ToTable("PartnershipTypeLanguages", (string)null);
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.PhoneNumber", b =>
@@ -1299,17 +1247,6 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("NewsPost");
                 });
 
-            modelBuilder.Entity("Volt.Domain.Entities.PartnershipTypeLanguage", b =>
-                {
-                    b.HasOne("Volt.Domain.Entities.PartnershipType", "PartnershipType")
-                        .WithMany("Languages")
-                        .HasForeignKey("PartnershipTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("PartnershipType");
-                });
-
             modelBuilder.Entity("Volt.Domain.Entities.PhoneNumber", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.ContactInfo", "ContactInfo")
@@ -1566,11 +1503,6 @@ namespace Volt.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.NewsPost", b =>
-                {
-                    b.Navigation("Languages");
-                });
-
-            modelBuilder.Entity("Volt.Domain.Entities.PartnershipType", b =>
                 {
                     b.Navigation("Languages");
                 });

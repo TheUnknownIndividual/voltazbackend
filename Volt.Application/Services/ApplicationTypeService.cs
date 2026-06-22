@@ -23,12 +23,7 @@ namespace Volt.Application.Services
             var languages = await _uow.Repository<ApplicationTypeLanguage>().ListNoTrackingAsync(ct);
 
             var result = appTypes
-                // ServiceManagementId dolu olanlar əvvəl
-                .OrderBy(x => x.ServiceManagementId is null)
-                // qruplaşma: eyni ServiceManagementId yanaşı
-                .ThenBy(x => x.ServiceManagementId ?? int.MaxValue)
-                // qrup daxilində sabit sıralama
-                .ThenByDescending(x => x.CreatedAt)
+                .OrderByDescending(x => x.CreatedAt)
                 .Select(x => MapToDto(
                     x,
                     languages
@@ -53,7 +48,7 @@ namespace Volt.Application.Services
                     ErrorCode.APPLICATION_TYPE_NOT_FOUND);
             }
 
-            var dto = await BuildDtoAsync(id, languageCode, ct);
+            var dto = await BuildDtoAsync(id, null, ct);
             return ApiResponse<ApplicationTypeDto>.SuccessResponse(dto);
         }
 
@@ -67,21 +62,8 @@ namespace Volt.Application.Services
 
             try
             {
-                if (request.ServiceManagementId is not null)
-                {
-                    var exists = await _uow.Repository<ServiceManagement>()
-                        .AnyAsync(x => x.Id == request.ServiceManagementId && x.IsActive, ct);
-                    if (!exists)
-                    {
-                        return ApiResponse<ApplicationTypeDto>.ErrorResponse(
-                            ErrorCode.SERVICE_NOT_FOUND,
-                            ErrorCode.SERVICE_NOT_FOUND);
-                    }
-                }
-
                 var appType = new ApplicationType
                 {
-                    ServiceManagementId = request.ServiceManagementId,
                     IsActive = true,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = null
@@ -134,19 +116,6 @@ namespace Volt.Application.Services
 
             try
             {
-                if (request.ServiceManagementId is not null)
-                {
-                    var exists = await _uow.Repository<ServiceManagement>()
-                        .AnyAsync(x => x.Id == request.ServiceManagementId && x.IsActive, ct);
-                    if (!exists)
-                    {
-                        return ApiResponse<ApplicationTypeDto>.ErrorResponse(
-                            ErrorCode.SERVICE_NOT_FOUND,
-                            ErrorCode.SERVICE_NOT_FOUND);
-                    }
-                }
-
-                appType.ServiceManagementId = request.ServiceManagementId;
                 appType.IsActive = request.IsActive;
                 appType.UpdatedAt = DateTime.UtcNow;
 
@@ -284,7 +253,6 @@ namespace Volt.Application.Services
 
             return new(
                 appType.Id,
-                appType.ServiceManagementId,
                 appType.IsActive,
                 appType.CreatedAt,
                 appType.UpdatedAt,

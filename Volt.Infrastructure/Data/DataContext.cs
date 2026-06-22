@@ -22,6 +22,8 @@ namespace Volt.Infrastructure.Data
         public DbSet<ServiceManagementLanguage> ServiceManagementLanguages { get; set; }
         public DbSet<ApplicationType> ApplicationTypes { get; set; }
         public DbSet<ApplicationTypeLanguage> ApplicationTypeLanguages { get; set; }
+        public DbSet<PartnershipType> PartnershipTypes { get; set; }
+        public DbSet<PartnershipTypeLanguage> PartnershipTypeLanguages { get; set; }
         public DbSet<ContactInfo> ContactInfos { get; set; }
         public DbSet<ContactLanguage> ContactLanguages { get; set; }
         public DbSet<PhoneNumber> PhoneNumbers { get; set; }

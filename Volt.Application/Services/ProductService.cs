@@ -75,12 +75,23 @@ namespace Volt.Application.Services
             }
         }
 
-        public async Task<ApiResponse<IReadOnlyList<ProductDto>>> GetAllAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<PagedResult<ProductDto>>> GetAllForHomePageAsync(ProductFiltrHomePageDto dto, CancellationToken ct = default)
         {
-            var products = await _uow.Repository<Product>().ListNoTrackingAsync(x => x.IsActive, ct);
+            var page = dto?.Page > 0 ? dto.Page : 1;
+            var pageSize = dto?.PageSize > 0 ? Math.Min(dto.PageSize, 100) : 10;
+
+            var products = await _uow.Repository<Product>().ListNoTrackingPagedAsync(x => x.IsActive && x.InHomePage,x=> x.Id, page, pageSize , ct);
             if (products.Count == 0)
             {
-                return ApiResponse<IReadOnlyList<ProductDto>>.SuccessResponse(Array.Empty<ProductDto>());
+                return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
+                {
+                    Items = Array.Empty<ProductDto>(),
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = 0,
+                    TotalPages = 0
+                });
+
             }
 
             var productIds = products.Select(x => x.Id).ToHashSet();
@@ -105,15 +116,51 @@ namespace Volt.Application.Services
                     promotionIdsByProduct.GetValueOrDefault(x.Id, [])))
                 .ToList();
 
-            return ApiResponse<IReadOnlyList<ProductDto>>.SuccessResponse(result);
-        }
-        public async Task<ApiResponse<IReadOnlyList<ProductDto>>> GetAllForHomePageAsync(CancellationToken ct = default)
-        {
-            var products = await _uow.Repository<Product>().ListNoTrackingAsync(x => x.IsActive && x.InHomePage, ct);
-            if (products.Count == 0)
+            return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
             {
-                return ApiResponse<IReadOnlyList<ProductDto>>.SuccessResponse(Array.Empty<ProductDto>());
+                Items = result,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = products.Count,
+                TotalPages = (int)Math.Ceiling(products.Count / (double)pageSize)
+            });
+
+        }
+        public async Task<ApiResponse<PagedResult<ProductDto>>> GetAllAsync(ProductFiltrDto dto = null, CancellationToken ct = default)
+        {
+            int? categoryId = dto?.ProductCategoryId;
+            int? subCategoryId = dto?.ProductSubCategoryId;
+            var page = dto?.Page > 0 ? dto.Page : 1;
+            var pageSize = dto?.PageSize > 0 ? Math.Min(dto.PageSize, 100) : 10;
+
+            var productRepo = _uow.Repository<Product>();
+
+            var totalCount = await productRepo.CountAsync(
+                x => x.IsActive
+                    && (categoryId == null || x.ProductCategoryId == categoryId)
+                    && (subCategoryId == null || x.ProductSubCategoryId == subCategoryId),
+                ct);
+
+            if (totalCount == 0)
+            {
+                return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
+                {
+                    Items = Array.Empty<ProductDto>(),
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = 0,
+                    TotalPages = 0
+                });
             }
+
+            var products = await productRepo.ListNoTrackingPagedAsync(
+                x => x.IsActive
+                    && (categoryId == null || x.ProductCategoryId == categoryId)
+                    && (subCategoryId == null || x.ProductSubCategoryId == subCategoryId),
+                x => Guid.NewGuid(),
+                page,
+                pageSize,
+                ct);
 
             var productIds = products.Select(x => x.Id).ToHashSet();
             var allImages = await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
@@ -126,8 +173,7 @@ namespace Volt.Application.Services
                     x => descriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
             var promotionIdsByProduct = await GetActivePromotionIdsByProductAsync(productIds, ct);
 
-            var result = products
-                .OrderBy(x => x.Id)
+            var items = products
                 .Select(x => MapToDto(
                     x,
                     allImages.Where(i => i.ProductId == x.Id),
@@ -137,9 +183,15 @@ namespace Volt.Application.Services
                     promotionIdsByProduct.GetValueOrDefault(x.Id, [])))
                 .ToList();
 
-            return ApiResponse<IReadOnlyList<ProductDto>>.SuccessResponse(result);
-        }
-
+            return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
+        }  
         public async Task<ApiResponse<ProductDto>> GetByIdAsync(int id, CancellationToken ct = default)
         {
             var product = await _uow.Repository<Product>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
@@ -593,17 +645,24 @@ namespace Volt.Application.Services
                 promotionIds);
         }
 
-        public async Task<ApiResponse<NoContentDto>> ShowHomePage(int id, CancellationToken ct = default)
+        public async Task<ApiResponse<NoContentDto>> ShowHomePage(ProductShowHomePageDto dto, CancellationToken ct = default)
         {
+            
             var productRepo = _uow.Repository<Product>();
-            var product = await productRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
+            var product = await productRepo.FirstOrDefaultAsync(x => x.Id == dto.ProductId && x.IsActive, ct);
 
-            product.InHomePage = true;
-
+            product.InHomePage = dto.Show;
             productRepo.Update(product);
             await _uow.SaveChangesAsync(ct);
 
             return  ApiResponse<NoContentDto>.SuccessResponse(null);
+        }
+
+        public async Task<ApiResponse<int>> ShowHomePageProductCount(CancellationToken ct = default)
+        {
+            var count = await _uow.Repository<Product>().CountAsync(x => x.IsActive && x.InHomePage, ct);
+
+            return ApiResponse<int>.SuccessResponse(count);
         }
     }
 }

@@ -128,7 +128,7 @@ namespace Volt.Application.Services
 
                 var newAdmin = new AdminUser
                 {
-                    Username = name,
+                    Username = name.ToLower(),
                     PasswordHash = passwordHash,
                     PasswordSalt = passwordSalt,
                     Role = Role.Admin,

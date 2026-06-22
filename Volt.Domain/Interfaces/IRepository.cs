@@ -21,6 +21,21 @@ namespace Volt.Domain.Interfaces
 
         Task<List<T>> ListNoTrackingAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
 
+        Task<int> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
+
+        Task<List<T>> ListNoTrackingPagedAsync(
+            Expression<Func<T, bool>> predicate,
+            Expression<Func<T, int>> orderBy,
+            int page,
+            int pageSize,
+            CancellationToken ct = default);
+
+        Task<List<T>> ListNoTrackingPagedAsync(
+            Expression<Func<T, bool>> predicate,
+            Expression<Func<T, Guid>> orderBy,
+            int page,
+            int pageSize,
+            CancellationToken ct = default);
         Task AddAsync(T entity, CancellationToken ct = default);
 
         void Update(T entity);

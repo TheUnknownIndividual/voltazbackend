@@ -30,7 +30,7 @@ namespace Volt.Application.Services
         {
             var repo = _uow.Repository<AdminUser>(); 
 
-            var admin = await repo.FirstOrDefaultNoTrackingAsync(u => u.Username == request.Username, ct);
+            var admin = await repo.FirstOrDefaultNoTrackingAsync(u => u.Username.ToLower() == request.Username.ToLower(), ct);
 
             if (admin is null)
                 return ApiResponse<TokenDto>.ErrorResponse(ErrorCode.INVALID_USERNAME, null);

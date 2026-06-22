@@ -1,8 +1,8 @@
 namespace Volt.Application.Dtos.Product
 {
     public sealed record ProductParametrDto(
-        decimal? TechnicalPower,
+        string? TechnicalPower,
         decimal? Effectiveness,
         int? Count,
-        int? Amount);
+        decimal? Amount);
 }

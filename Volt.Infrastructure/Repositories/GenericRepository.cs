@@ -34,6 +34,25 @@ namespace Volt.Infrastructure.Repositories
 
         public Task<List<T>> ListNoTrackingAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) => _dbSet.AsNoTracking().Where(predicate).ToListAsync(ct);
 
+        public Task<int> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default)
+            => _dbSet.AsNoTracking().CountAsync(predicate, ct);
+
+        public Task<List<T>> ListNoTrackingPagedAsync(
+            Expression<Func<T, bool>> predicate,
+            Expression<Func<T, int>> orderBy,
+            int page,
+            int pageSize,
+            CancellationToken ct = default)
+        {
+            var skip = (page - 1) * pageSize;
+            return _dbSet.AsNoTracking()
+                .Where(predicate)
+                .OrderBy(orderBy)
+                .Skip(skip)
+                .Take(pageSize)
+                .ToListAsync(ct);
+        }
+
         public async Task<int> MaxAsync(Expression<Func<T, int>> selector, CancellationToken ct = default)
         {
             // Cədvəl boşdursa 0, dolu dursa Max rəqəmi qaytarır
@@ -42,5 +61,16 @@ namespace Volt.Infrastructure.Repositories
 
         public void Remove(T entity) => _dbSet.Remove(entity);
         public void Update(T entity) => _dbSet.Update(entity);
+
+        public Task<List<T>> ListNoTrackingPagedAsync(Expression<Func<T, bool>> predicate, Expression<Func<T, Guid>> orderBy, int page, int pageSize, CancellationToken ct = default)
+        {
+            var skip = (page - 1) * pageSize;
+            return _dbSet.AsNoTracking()
+                .Where(predicate)
+                .OrderBy(orderBy)
+                .Skip(skip)
+                .Take(pageSize)
+                .ToListAsync(ct);
+        }
     }
 }

@@ -17,7 +17,7 @@ namespace Volt.API.Controllers
             _service = service;
         }
 
-       // [Authorize]
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] byte? status, CancellationToken ct)
             => CreateActionResult(await _service.GetAllAsync(status, ct));
@@ -37,7 +37,7 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.UpdateAsync(id, request, ct));
 
         [Authorize]
-        [HttpPatch("{id:int}/status")]
+        [HttpPatch("status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] ServiceRequestStatusUpdateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.UpdateStatusAsync(id, request, ct));
 

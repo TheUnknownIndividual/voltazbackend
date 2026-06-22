@@ -22,12 +22,12 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.CreateAsync(request, ct));
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(CancellationToken ct)
-            => CreateActionResult(await _service.GetAllAsync(ct));
+        public async Task<IActionResult> GetAll([FromQuery] ProductFiltrDto dto, CancellationToken ct)
+            => CreateActionResult(await _service.GetAllAsync(dto, ct));
 
         [HttpGet("HomePage")]
-        public async Task<IActionResult> GetAllForHomePage(CancellationToken ct)
-            => CreateActionResult(await _service.GetAllForHomePageAsync(ct));
+        public async Task<IActionResult> GetAllForHomePage([FromQuery] ProductFiltrHomePageDto dto ,CancellationToken ct)
+            => CreateActionResult(await _service.GetAllForHomePageAsync(dto, ct));
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id, CancellationToken ct)
@@ -39,13 +39,18 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.UpdateAsync(id, request, ct));
 
         [Authorize]
-        [HttpPut("{id:int}/ShowHomePage")]
-        public async Task<IActionResult> ShowHomePage(int id, CancellationToken ct)
-            => CreateActionResult(await _service.ShowHomePage(id, ct));
+        [HttpPut("ShowHomePage")]
+        public async Task<IActionResult> ShowHomePage(ProductShowHomePageDto dto, CancellationToken ct)
+            => CreateActionResult(await _service.ShowHomePage(dto, ct));
 
         [Authorize]
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
             => CreateActionResult(await _service.DeleteAsync(id, ct));
+
+        [Authorize]
+        [HttpGet("ShowHomePageProductCount")]
+        public async Task<IActionResult> ShowHomePageProductCount(CancellationToken ct)
+            => CreateActionResult(await _service.ShowHomePageProductCount(ct));
     }
 }

@@ -17,11 +17,6 @@ namespace Volt.Infrastructure.Configuration
 
             builder.HasKey(x => x.Id);
 
-            builder.HasOne(x => x.ServiceManagement)
-             .WithMany() 
-             .HasForeignKey(x => x.ServiceManagementId)
-             .OnDelete(DeleteBehavior.SetNull); // Service silinərsə, Id null olsun
-
             builder.Property(x => x.IsActive)
                 .HasDefaultValue(true);
         }

@@ -31,7 +31,7 @@ namespace Volt.Application.Services
                     langs.Where(l => l.ContactInfoId == x.Id).OrderBy(l => l.Id).ToList(),
                     phones.Where(p => p.ContactInfoId == x.Id).OrderBy(p => p.Id).ToList(),
                     emails.Where(e => e.ContactInfoId == x.Id).OrderBy(e => e.Id).ToList(),
-                    languageCode))
+                    null))
                 .ToList();
 
             return ApiResponse<IReadOnlyList<ContactInfoDto>>.SuccessResponse(result);
@@ -45,7 +45,7 @@ namespace Volt.Application.Services
                 return ApiResponse<ContactInfoDto>.ErrorResponse(ErrorCode.CONTACT_INFO_NOT_FOUND, ErrorCode.CONTACT_INFO_NOT_FOUND);
             }
 
-            var dto = await BuildDtoAsync(id, languageCode, ct);
+            var dto = await BuildDtoAsync(id, null, ct);
             return ApiResponse<ContactInfoDto>.SuccessResponse(dto);
         }
 
@@ -105,7 +105,7 @@ namespace Volt.Application.Services
                 await ReplaceEmailsAsync(id, request.EmailAddresses, ct);
                 await _uow.SaveChangesAsync(ct);
 
-                var dto = await BuildDtoAsync(id, languageCode, ct);
+                var dto = await BuildDtoAsync(id, null, ct);
                 return ApiResponse<ContactInfoDto>.SuccessResponse(dto);
             }
             catch
