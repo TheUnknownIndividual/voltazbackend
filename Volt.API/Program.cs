@@ -47,6 +47,7 @@ namespace Volt.API
             builder.Services.AddScoped<IServiceManagementService, ServiceManagementService>();
             builder.Services.AddScoped<IApplicationTypeService, ApplicationTypeService>();
             builder.Services.AddScoped<IPartnershipTypeService, PartnershipTypeService>();
+            builder.Services.AddScoped<IPartnershipRequestService, PartnershipRequestService>();
             builder.Services.AddScoped<IContactRequstService, ContactRequstService>();
             builder.Services.AddScoped<IContactInfoService, ContactInfoService>();
             builder.Services.AddScoped<IServiceRequestService, ServiceRequestService>();

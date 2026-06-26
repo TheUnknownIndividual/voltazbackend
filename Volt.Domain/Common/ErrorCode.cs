@@ -46,6 +46,9 @@ namespace Volt.Domain.Common
         public const string PARTNERSHIP_TYPE_ALL_LANGUAGES_REQUIRED = "All 4 languages are required for partnership type";
         public const string INVALID_PARTNERSHIP_TYPE_REQUEST = "Invalid partnership type request";
 
+        public const string PARTNERSHIP_REQUEST_NOT_FOUND = "Partnership request not found";
+        public const string PARTNERSHIP_REQUEST_STATUS_UNCHANGED = "Partnership request status is already set to this value";
+
         public const string CONTACT_INFO_NOT_FOUND = "Contact info not found";
         public const string CONTACT_LANGUAGE_DUPLICATE = "Duplicate language exists for contact info";
         public const string INVALID_CONTACT_INFO_REQUEST = "Invalid contact info request";

@@ -8,5 +8,6 @@
         public DateTime? UpdatedAt { get; set; }
 
         public ICollection<PartnershipTypeLanguage> Languages { get; set; } = new List<PartnershipTypeLanguage>();
+        public ICollection<PartnershipRequest> PartnershipRequests { get; set; } = new List<PartnershipRequest>();
     }
 }
