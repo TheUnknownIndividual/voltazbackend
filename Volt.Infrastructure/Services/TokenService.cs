@@ -44,5 +44,32 @@ namespace Volt.Infrastructure.Services
 
             return new TokenDto(tokenstring);
         }
+
+        public TokenDto CreateCustomerAccessToken(CustomerUser customer)
+        {
+            var fullName = $"{customer.FirstName} {customer.LastName}".Trim();
+            var claims = new List<Claim>
+            {
+                new (ClaimTypes.NameIdentifier, customer.Id.ToString()),
+                new (ClaimTypes.Name, fullName),
+                new (ClaimTypes.Email, customer.Email),
+                new (ClaimTypes.Role, customer.Role.ToString()),
+                new (JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["TokenOptions:SecurityKey"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                issuer: _config["TokenOptions:Issuer"],
+                audience: _config["TokenOptions:Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(7),
+                signingCredentials: creds
+            );
+
+            var tokenstring = new JwtSecurityTokenHandler().WriteToken(token);
+            return new TokenDto(tokenstring);
+        }
     }
 }

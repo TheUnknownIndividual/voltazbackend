@@ -14,6 +14,9 @@ namespace Volt.Infrastructure.Data
         {
         }
         public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+        public DbSet<CustomerUser> CustomerUsers => Set<CustomerUser>();
+        public DbSet<CustomerExternalLogin> CustomerExternalLogins => Set<CustomerExternalLogin>();
+        public DbSet<CustomerPasskeyCredential> CustomerPasskeyCredentials => Set<CustomerPasskeyCredential>();
         public DbSet<About> Abouts { get; set; }
         public DbSet<AboutLanguage> AboutLanguages { get; set; }
         public DbSet<Step> Steps { get; set; }
@@ -52,6 +55,12 @@ namespace Volt.Infrastructure.Data
         public DbSet<ProductDescription> ProductDescriptions { get; set; }
         public DbSet<ProductDescriptionLanguage> ProductDescriptionLanguages { get; set; }
         public DbSet<ProductPromotion> ProductPromotions { get; set; }
+        public DbSet<SolarSalesProject> SolarSalesProjects { get; set; }
+        public DbSet<SolarCalculationLog> SolarCalculationLogs { get; set; }
+        public DbSet<DocumentSequence> DocumentSequences { get; set; }
+        public DbSet<DocumentLog> DocumentLogs { get; set; }
+        public DbSet<Order> Orders { get; set; }
+        public DbSet<OrderItem> OrderItems { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

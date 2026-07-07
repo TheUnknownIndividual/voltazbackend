@@ -13,6 +13,12 @@ namespace Volt.Domain.Common
         public const string INVALID_USERNAME = "INVALID_USERNAME";
         public const string INVALID_PASSWORD = "INVALID_PASSWORD";
         public const string ADMIN_NOT_FOUND = "Admin not found";
+        public const string CUSTOMER_NOT_FOUND = "Customer not found";
+        public const string CUSTOMER_ALREADY_EXISTS = "Customer already exists";
+        public const string INVALID_CUSTOMER_REQUEST = "Invalid customer request";
+        public const string INVALID_EXTERNAL_AUTH_TOKEN = "Invalid external auth token";
+        public const string INVALID_PASSKEY_CHALLENGE = "Invalid passkey challenge";
+        public const string PASSKEY_NOT_FOUND = "Passkey not found";
 
 
         public const string ABOUT_NOT_FOUND = "About not found";
@@ -98,6 +104,11 @@ namespace Volt.Domain.Common
         public const string INVALID_PRODUCT_REQUEST = "Invalid product request";
         public const string PRODUCT_PROMOTION_CONFLICT = "Promotion is already assigned to another product";
         public const string PRODUCT_DESCRIPTION_LANGUAGE_DUPLICATE = "Duplicate language exists for product description";
+
+        public const string ORDER_NOT_FOUND = "Order not found";
+        public const string INVALID_ORDER_REQUEST = "Invalid order request";
+        public const string INVALID_ORDER_STATUS = "Invalid order status";
+        public const string INVALID_PAYMENT_STATUS = "Invalid payment status";
 
     }
 }

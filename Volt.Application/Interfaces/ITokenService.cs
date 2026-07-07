@@ -11,5 +11,6 @@ namespace Volt.Application.Interfaces
     public interface ITokenService
     {
         TokenDto CreateAdminAccessToken(AdminUser admin);
+        TokenDto CreateCustomerAccessToken(CustomerUser customer);
     }
 }

@@ -11,10 +11,17 @@ namespace Volt.Application.Services
     public sealed class ProductService : IProductService
     {
         private readonly IUnitOfWork _uow;
+        private readonly IProductSearchService _productSearchService;
+        private readonly ISeoSubmissionQueue _seoSubmissionQueue;
 
-        public ProductService(IUnitOfWork uow)
+        public ProductService(
+            IUnitOfWork uow,
+            IProductSearchService productSearchService,
+            ISeoSubmissionQueue seoSubmissionQueue)
         {
             _uow = uow;
+            _productSearchService = productSearchService;
+            _seoSubmissionQueue = seoSubmissionQueue;
         }
 
         public async Task<ApiResponse<ProductDto>> CreateAsync(ProductCreateRequest request, CancellationToken ct = default)
@@ -44,6 +51,7 @@ namespace Volt.Application.Services
 
             try
             {
+                var hasAvailableStock = HasAvailableStock(request.ProductParametrs);
                 var product = new Product
                 {
                     ProductName = request.ProductName.Trim(),
@@ -51,7 +59,8 @@ namespace Volt.Application.Services
                     ProductSubCategoryId = request.ProductSubCategoryId,
                     ProductBrandId = request.ProductBrandId,
                     ProductTechnologyId = request.ProductTechnologyId,
-                    InStock = request.InStock,
+                    InStock = hasAvailableStock,
+                    OutOfStockAt = hasAvailableStock ? null : DateTime.UtcNow,
                     InHomePage = request.InHomePage,
                     Certificate = request.Certificate,
                     IsActive = true
@@ -65,8 +74,10 @@ namespace Volt.Application.Services
                 await ReplaceProductDescriptionsAsync(product.Id, request.ProductDescriptions, ct);
                 await ReplaceProductPromotionsAsync(product.Id, request.PromotionIds, ct);
                 await _uow.SaveChangesAsync(ct);
+                _productSearchService.Invalidate();
 
                 var dto = await BuildDtoAsync(product.Id, ct);
+                _seoSubmissionQueue.EnqueueProductCreated(product.Id);
                 return ApiResponse<ProductDto>.SuccessResponse(dto);
             }
             catch (Exception ex)
@@ -80,8 +91,8 @@ namespace Volt.Application.Services
             var page = dto?.Page > 0 ? dto.Page : 1;
             var pageSize = dto?.PageSize > 0 ? Math.Min(dto.PageSize, 100) : 10;
 
-            var products = await _uow.Repository<Product>().ListNoTrackingPagedAsync(x => x.IsActive && x.InHomePage,x=> x.Id, page, pageSize , ct);
-            if (products.Count == 0)
+            var allProducts = await _uow.Repository<Product>().ListNoTrackingAsync(x => x.IsActive && x.InHomePage, ct);
+            if (allProducts.Count == 0)
             {
                 return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
                 {
@@ -94,7 +105,7 @@ namespace Volt.Application.Services
 
             }
 
-            var productIds = products.Select(x => x.Id).ToHashSet();
+            var productIds = allProducts.Select(x => x.Id).ToHashSet();
             var allImages = await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
             var allParametrs = await _uow.Repository<ProductParametr>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId) && x.IsActive, ct);
             var allDescriptions = await _uow.Repository<ProductDescription>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
@@ -105,8 +116,15 @@ namespace Volt.Application.Services
                     x => descriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
             var promotionIdsByProduct = await GetActivePromotionIdsByProductAsync(productIds, ct);
 
+            var products = allProducts
+                .OrderByDescending(x => HasPurchasableVariant(x.Id, allParametrs))
+                .ThenByDescending(x => HasVisiblePrice(x.Id, allParametrs))
+                .ThenByDescending(x => x.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
             var result = products
-                .OrderBy(x => x.Id)
                 .Select(x => MapToDto(
                     x,
                     allImages.Where(i => i.ProductId == x.Id),
@@ -121,8 +139,8 @@ namespace Volt.Application.Services
                 Items = result,
                 Page = page,
                 PageSize = pageSize,
-                TotalCount = products.Count,
-                TotalPages = (int)Math.Ceiling(products.Count / (double)pageSize)
+                TotalCount = allProducts.Count,
+                TotalPages = (int)Math.Ceiling(allProducts.Count / (double)pageSize)
             });
 
         }
@@ -132,16 +150,22 @@ namespace Volt.Application.Services
             int? subCategoryId = dto?.ProductSubCategoryId;
             var page = dto?.Page > 0 ? dto.Page : 1;
             var pageSize = dto?.PageSize > 0 ? Math.Min(dto.PageSize, 100) : 10;
+            var search = ProductSearchHelper.Normalize(dto?.Search);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                return await GetAllBySearchAsync(categoryId, subCategoryId, search, page, pageSize, dto?.StockStatus ?? ProductStockStatus.All, ct);
+            }
 
             var productRepo = _uow.Repository<Product>();
 
-            var totalCount = await productRepo.CountAsync(
+            var allProducts = await productRepo.ListNoTrackingAsync(
                 x => x.IsActive
                     && (categoryId == null || x.ProductCategoryId == categoryId)
                     && (subCategoryId == null || x.ProductSubCategoryId == subCategoryId),
                 ct);
 
-            if (totalCount == 0)
+            if (allProducts.Count == 0)
             {
                 return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
                 {
@@ -153,16 +177,7 @@ namespace Volt.Application.Services
                 });
             }
 
-            var products = await productRepo.ListNoTrackingPagedAsync(
-                x => x.IsActive
-                    && (categoryId == null || x.ProductCategoryId == categoryId)
-                    && (subCategoryId == null || x.ProductSubCategoryId == subCategoryId),
-                x => Guid.NewGuid(),
-                page,
-                pageSize,
-                ct);
-
-            var productIds = products.Select(x => x.Id).ToHashSet();
+            var productIds = allProducts.Select(x => x.Id).ToHashSet();
             var allImages = await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
             var allParametrs = await _uow.Repository<ProductParametr>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId) && x.IsActive, ct);
             var allDescriptions = await _uow.Repository<ProductDescription>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
@@ -173,7 +188,22 @@ namespace Volt.Application.Services
                     x => descriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
             var promotionIdsByProduct = await GetActivePromotionIdsByProductAsync(productIds, ct);
 
-            var items = products
+            var stockStatus = dto?.StockStatus ?? ProductStockStatus.All;
+            var products = allProducts
+                .Where(x => MatchesStockStatus(x, allParametrs, stockStatus))
+                .OrderByDescending(x => stockStatus == ProductStockStatus.OutOfStock ? x.OutOfStockAt ?? DateTime.MinValue : DateTime.MinValue)
+                .ThenByDescending(x => HasPurchasableVariant(x.Id, allParametrs))
+                .ThenByDescending(x => HasVisiblePrice(x.Id, allParametrs))
+                .ThenByDescending(x => x.Id)
+                .ToList();
+
+            var totalCount = products.Count;
+            var pagedProducts = products
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var items = pagedProducts
                 .Select(x => MapToDto(
                     x,
                     allImages.Where(i => i.ProductId == x.Id),
@@ -192,6 +222,90 @@ namespace Volt.Application.Services
                 TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
             });
         }  
+
+        private static bool HasVisiblePrice(int productId, IEnumerable<ProductParametr> parametrs)
+            => parametrs.Any(x => x.ProductId == productId && x.Amount > 0);
+
+        private static bool HasPurchasableVariant(int productId, IEnumerable<ProductParametr> parametrs)
+            => parametrs.Any(x => x.ProductId == productId && x.IsActive && x.Count.GetValueOrDefault() > 0 && x.Amount.GetValueOrDefault() > 0);
+
+        private static bool HasAvailableStock(IEnumerable<ProductParametrCreateRequest> parametrs)
+            => parametrs?.Any(x => x.Count > 0) == true;
+
+        private static bool ProductHasAvailableStock(int productId, IEnumerable<ProductParametr> parametrs)
+            => parametrs.Any(x => x.ProductId == productId && x.IsActive && x.Count.GetValueOrDefault() > 0);
+
+        private static bool MatchesStockStatus(Product product, IEnumerable<ProductParametr> parametrs, ProductStockStatus status)
+        {
+            if (status == ProductStockStatus.All)
+            {
+                return true;
+            }
+
+            var available = product.InStock && ProductHasAvailableStock(product.Id, parametrs);
+            return status == ProductStockStatus.InStock ? available : !available;
+        }
+
+        private async Task<ApiResponse<PagedResult<ProductDto>>> GetAllBySearchAsync(
+            int? categoryId,
+            int? subCategoryId,
+            string search,
+            int page,
+            int pageSize,
+            ProductStockStatus stockStatus,
+            CancellationToken ct)
+        {
+            var matchedProducts = await _productSearchService.SearchAsync(search, categoryId, subCategoryId, ct);
+            matchedProducts = matchedProducts
+                .Where(x => MatchesStockStatus(x.Product, x.Parametrs, stockStatus))
+                .ToList();
+
+            if (stockStatus == ProductStockStatus.OutOfStock)
+            {
+                matchedProducts = matchedProducts
+                    .OrderByDescending(x => x.Product.OutOfStockAt ?? DateTime.MinValue)
+                    .ThenByDescending(x => x.Product.Id)
+                    .ToList();
+            }
+
+            var totalCount = matchedProducts.Count;
+            if (totalCount == 0)
+            {
+                return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
+                {
+                    Items = Array.Empty<ProductDto>(),
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = 0,
+                    TotalPages = 0
+                });
+            }
+
+            var pagedProducts = matchedProducts
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var items = pagedProducts
+                .Select(x => MapToDto(
+                    x.Product,
+                    x.Images,
+                    x.Parametrs,
+                    x.Descriptions,
+                    x.DescriptionLanguages,
+                    x.PromotionIds))
+                .ToList();
+
+            return ApiResponse<PagedResult<ProductDto>>.SuccessResponse(new PagedResult<ProductDto>
+            {
+                Items = items,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+            });
+        }
+
         public async Task<ApiResponse<ProductDto>> GetByIdAsync(int id, CancellationToken ct = default)
         {
             var product = await _uow.Repository<Product>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
@@ -237,12 +351,22 @@ namespace Volt.Application.Services
 
             try
             {
+                var previousInStock = product.InStock;
+                var hasAvailableStock = HasAvailableStock(request.ProductParametrs);
                 product.ProductName = request.ProductName.Trim();
                 product.ProductCategoryId = request.ProductCategoryId;
                 product.ProductSubCategoryId = request.ProductSubCategoryId;
                 product.ProductBrandId = request.ProductBrandId;
                 product.ProductTechnologyId = request.ProductTechnologyId;
-                product.InStock = request.InStock;
+                product.InStock = hasAvailableStock;
+                if (!hasAvailableStock && previousInStock)
+                {
+                    product.OutOfStockAt = DateTime.UtcNow;
+                }
+                if (hasAvailableStock)
+                {
+                    product.OutOfStockAt = null;
+                }
                 product.InHomePage = request.InHomePage;
                 product.Certificate = request.Certificate;
                 productRepo.Update(product);
@@ -252,6 +376,7 @@ namespace Volt.Application.Services
                 await ReplaceProductDescriptionsAsync(id, request.ProductDescriptions, ct);
                 await ReplaceProductPromotionsAsync(id, request.PromotionIds, ct);
                 await _uow.SaveChangesAsync(ct);
+                _productSearchService.Invalidate();
 
                 var dto = await BuildDtoAsync(id, ct);
                 return ApiResponse<ProductDto>.SuccessResponse(dto);
@@ -277,6 +402,7 @@ namespace Volt.Application.Services
                 productRepo.Update(product);
                 await UnlinkProductPromotionsAsync(id, ct);
                 await _uow.SaveChangesAsync(ct);
+                _productSearchService.Invalidate();
                 return ApiResponse<NoContentDto>.SuccessResponse(null);
             }
             catch
@@ -617,6 +743,9 @@ namespace Volt.Application.Services
             var productImageList = images.Where(x => x.Type).Select(x => x.ImageUrl).ToList();
             var productDatasheetList = images.Where(x => !x.Type).Select(x => x.ImageUrl).ToList();
             var parametrList = parametrs
+                .OrderByDescending(x => product.InStock && x.Count.GetValueOrDefault() > 0 && x.Amount.GetValueOrDefault() > 0)
+                .ThenByDescending(x => x.Count.GetValueOrDefault() > 0)
+                .ThenByDescending(x => x.Amount.GetValueOrDefault() > 0)
                 .Select(x => new ProductParametrDto(x.TechnicalPower, x.Effectiveness, x.Count, x.Amount))
                 .ToList();
             var descriptionList = descriptions
@@ -636,6 +765,7 @@ namespace Volt.Application.Services
                 product.ProductBrandId,
                 product.ProductTechnologyId,
                 product.InStock,
+                product.OutOfStockAt,
                 product.InHomePage,
                 product.Certificate,
                 productImageList,
@@ -654,6 +784,7 @@ namespace Volt.Application.Services
             product.InHomePage = dto.Show;
             productRepo.Update(product);
             await _uow.SaveChangesAsync(ct);
+            _productSearchService.Invalidate();
 
             return  ApiResponse<NoContentDto>.SuccessResponse(null);
         }

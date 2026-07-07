@@ -5,6 +5,8 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Text;
+using Volt.API.Services;
+using Volt.Application.Configuration;
 using Volt.API.Infrastructure.Filters;
 using Volt.API.Infrastructure.Localization;
 using Volt.API.Middlewares;
@@ -28,6 +30,7 @@ namespace Volt.API
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+            builder.Services.AddMemoryCache();
 
             builder.Services.AddDbContext<DataContext>(options =>
                 options.UseSqlServer(
@@ -36,6 +39,7 @@ namespace Volt.API
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
             builder.Services.AddScoped<PasswordHelper>();
             builder.Services.AddScoped<IAdminAuthService, AdminAuthService>();
+            builder.Services.AddScoped<ICustomerAuthService, CustomerAuthService>();
             builder.Services.AddScoped<IAdminService, AdminService>();
 
             builder.Services.Configure<FtpOptions>(builder.Configuration.GetSection("FtpOptions"));
@@ -55,12 +59,23 @@ namespace Volt.API
             builder.Services.AddScoped<INewsPostService, NewsPostService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
+            builder.Services.Configure<SeoOptions>(builder.Configuration.GetSection("Seo"));
+            builder.Services.AddHttpClient("seo");
             builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
             builder.Services.AddScoped<IProductSubCategoryService, ProductSubCategoryService>();
             builder.Services.AddScoped<IProductBrandService, ProductBrandService>();
             builder.Services.AddScoped<IProductTechnologyService, ProductTechnologyService>();
+            builder.Services.AddScoped<IProductSearchService, ProductSearchService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
+            builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
+            builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();
+            builder.Services.AddHostedService<SeoSubmissionBackgroundService>();
+            builder.Services.AddScoped<ISearchService, SearchService>();
             builder.Services.AddScoped<IPromotionService, PromotionService>();
+            builder.Services.AddScoped<ISolarAnalyticsService, SolarAnalyticsService>();
+            builder.Services.AddScoped<IOrderService, OrderService>();
+            builder.Services.AddScoped<IOrderEmailService, OrderEmailService>();
 
             builder.Services.AddScoped<ITokenService, TokenService>();
 

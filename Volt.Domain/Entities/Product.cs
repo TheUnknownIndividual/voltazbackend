@@ -13,6 +13,7 @@
         public int? ProductTechnologyId { get; set; }
         public ProductTechnology ProductTechnology { get; set; }
         public bool InStock { get; set; }
+        public DateTime? OutOfStockAt { get; set; }
         public bool InHomePage { get; set; }
         public string Certificate { get; set; }
         public bool IsActive { get; set; }

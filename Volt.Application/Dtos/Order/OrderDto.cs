@@ -1,0 +1,33 @@
+namespace Volt.Application.Dtos.Order
+{
+    public sealed record OrderDto(
+        int Id,
+        string OrderNumber,
+        byte Status,
+        byte PaymentStatus,
+        byte PaymentMethod,
+        byte Source,
+        byte Intent,
+        bool RequiresManualConfirmation,
+        bool IsViewedByAdmin,
+        DateTime? AdminViewedAt,
+        bool AcceptedTerms,
+        DateTime? TermsAcceptedAt,
+        string FullName,
+        string Phone,
+        string Email,
+        byte DeliveryMethod,
+        string CityOrRegion,
+        string District,
+        string StreetAndBuilding,
+        string ApartmentOrOffice,
+        string DeliveryNotes,
+        string PickupLocation,
+        decimal ProductsSubtotal,
+        decimal? DeliveryFee,
+        decimal DiscountTotal,
+        decimal FinalTotal,
+        DateTime CreatedAt,
+        DateTime? UpdatedAt,
+        IReadOnlyList<OrderItemDto> Items);
+}

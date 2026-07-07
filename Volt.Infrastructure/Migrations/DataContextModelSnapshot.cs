@@ -117,6 +117,182 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("AdminUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.CustomerUser", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<byte[]>("PasswordHash")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<byte[]>("PasswordSalt")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int>("Role")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(2);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("Phone")
+                        .IsUnique()
+                        .HasFilter("[Phone] IS NOT NULL");
+
+                    b.ToTable("CustomerUsers", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.CustomerExternalLogin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CustomerUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<DateTime>("LastLoginAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ProviderSubject")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("nvarchar(240)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerUserId");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("Provider", "ProviderSubject")
+                        .IsUnique();
+
+                    b.ToTable("CustomerExternalLogins", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.CustomerPasskeyCredential", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<Guid>("AaGuid")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CredType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte[]>("CredentialId")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("varbinary(1024)");
+
+                    b.Property<string>("CredentialIdBase64Url")
+                        .IsRequired()
+                        .HasMaxLength(1400)
+                        .HasColumnType("nvarchar(1400)");
+
+                    b.Property<int>("CustomerUserId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<uint>("SignatureCounter")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte[]>("UserHandle")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varbinary(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CredentialId")
+                        .IsUnique();
+
+                    b.HasIndex("CredentialIdBase64Url")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerUserId");
+
+                    b.HasIndex("UserHandle");
+
+                    b.ToTable("CustomerPasskeyCredentials", (string)null);
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.ApplicationType", b =>
                 {
                     b.Property<int>("Id")
@@ -341,6 +517,92 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("Applications", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.DocumentLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AdminUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DocumentCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("SolarCalculationLogId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SolarSalesProjectId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdminUserId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("DocumentNumber")
+                        .IsUnique();
+
+                    b.HasIndex("SolarCalculationLogId");
+
+                    b.HasIndex("SolarSalesProjectId");
+
+                    b.ToTable("DocumentLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.DocumentSequence", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CurrentNumber")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DocumentCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentCode", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("DocumentSequences", (string)null);
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.EmailAddress", b =>
                 {
                     b.Property<int>("Id")
@@ -442,6 +704,149 @@ namespace Volt.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("NewsPostLanguages", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.Order", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApartmentOrOffice")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("CityOrRegion")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("DeliveryFee")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<byte>("DeliveryMethod")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("DeliveryNotes")
+                        .HasMaxLength(800)
+                        .HasColumnType("nvarchar(800)");
+
+                    b.Property<decimal>("DiscountTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("District")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(180)
+                        .HasColumnType("nvarchar(180)");
+
+                    b.Property<decimal>("FinalTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<byte>("PaymentMethod")
+                        .HasColumnType("tinyint");
+
+                    b.Property<byte>("PaymentStatus")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("PickupLocation")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<decimal>("ProductsSubtotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("RequiresManualConfirmation")
+                        .HasColumnType("bit");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<string>("StreetAndBuilding")
+                        .HasMaxLength(240)
+                        .HasColumnType("nvarchar(240)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.ToTable("Orders", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.OrderItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("LineTotal")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("nvarchar(240)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SelectedPower")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("OrderItems", (string)null);
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.PartnershipRequest", b =>
@@ -597,6 +1002,9 @@ namespace Volt.Infrastructure.Migrations
 
                     b.Property<bool>("InStock")
                         .HasColumnType("bit");
+
+                    b.Property<DateTime?>("OutOfStockAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
@@ -1214,6 +1622,95 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("ServiceRequests", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.SolarCalculationLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AdminUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("SolarSalesProjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdminUserId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("SolarSalesProjectId");
+
+                    b.HasIndex("Source", "EventType", "CreatedAt");
+
+                    b.ToTable("SolarCalculationLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.SolarSalesProject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("SolarSalesProjects", (string)null);
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.Step", b =>
                 {
                     b.Property<int>("Id")
@@ -1281,6 +1778,28 @@ namespace Volt.Infrastructure.Migrations
                     b.ToTable("StepLanguages", (string)null);
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.CustomerExternalLogin", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.CustomerUser", "CustomerUser")
+                        .WithMany("ExternalLogins")
+                        .HasForeignKey("CustomerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CustomerUser");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.CustomerPasskeyCredential", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.CustomerUser", "CustomerUser")
+                        .WithMany("PasskeyCredentials")
+                        .HasForeignKey("CustomerUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CustomerUser");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.AboutLanguage", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.About", "About")
@@ -1336,6 +1855,31 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("ApplicationType");
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.DocumentLog", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.AdminUser", "AdminUser")
+                        .WithMany()
+                        .HasForeignKey("AdminUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Volt.Domain.Entities.SolarCalculationLog", "SolarCalculationLog")
+                        .WithMany("DocumentLogs")
+                        .HasForeignKey("SolarCalculationLogId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Volt.Domain.Entities.SolarSalesProject", "SolarSalesProject")
+                        .WithMany("DocumentLogs")
+                        .HasForeignKey("SolarSalesProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AdminUser");
+
+                    b.Navigation("SolarCalculationLog");
+
+                    b.Navigation("SolarSalesProject");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.EmailAddress", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.ContactInfo", "ContactInfo")
@@ -1356,6 +1900,25 @@ namespace Volt.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("NewsPost");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.OrderItem", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.Order", "Order")
+                        .WithMany("Items")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Volt.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.PartnershipRequest", b =>
@@ -1598,6 +2161,23 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("ServiceManagement");
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.SolarCalculationLog", b =>
+                {
+                    b.HasOne("Volt.Domain.Entities.AdminUser", "AdminUser")
+                        .WithMany()
+                        .HasForeignKey("AdminUserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Volt.Domain.Entities.SolarSalesProject", "SolarSalesProject")
+                        .WithMany("CalculationLogs")
+                        .HasForeignKey("SolarSalesProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AdminUser");
+
+                    b.Navigation("SolarSalesProject");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.StepLanguage", b =>
                 {
                     b.HasOne("Volt.Domain.Entities.Step", "Step")
@@ -1635,9 +2215,21 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("PhoneNumbers");
                 });
 
+            modelBuilder.Entity("Volt.Domain.Entities.CustomerUser", b =>
+                {
+                    b.Navigation("ExternalLogins");
+
+                    b.Navigation("PasskeyCredentials");
+                });
+
             modelBuilder.Entity("Volt.Domain.Entities.NewsPost", b =>
                 {
                     b.Navigation("Languages");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.Order", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.PartnershipType", b =>
@@ -1712,6 +2304,18 @@ namespace Volt.Infrastructure.Migrations
                     b.Navigation("Languages");
 
                     b.Navigation("ServiceRequests");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.SolarCalculationLog", b =>
+                {
+                    b.Navigation("DocumentLogs");
+                });
+
+            modelBuilder.Entity("Volt.Domain.Entities.SolarSalesProject", b =>
+                {
+                    b.Navigation("CalculationLogs");
+
+                    b.Navigation("DocumentLogs");
                 });
 
             modelBuilder.Entity("Volt.Domain.Entities.Step", b =>

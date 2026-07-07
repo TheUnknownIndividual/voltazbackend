@@ -8,6 +8,7 @@ namespace Volt.Application.Dtos.Product
         int ProductBrandId,
         int? ProductTechnologyId,
         bool InStock,
+        DateTime? OutOfStockAt,
         bool InHomePage,
         string Certificate,
         IReadOnlyList<string> ProductImage,
