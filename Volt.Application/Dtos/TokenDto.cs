@@ -6,5 +6,11 @@ using System.Threading.Tasks;
 
 namespace Volt.Application.Dtos
 {
-    public sealed record TokenDto(string AccessToken);
+    using System.Text.Json.Serialization;
+
+    public sealed record TokenDto(string AccessToken)
+    {
+        [JsonIgnore]
+        public int UserId { get; init; }
+    }
 }

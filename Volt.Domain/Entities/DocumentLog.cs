@@ -11,7 +11,10 @@ namespace Volt.Domain.Entities
         public SolarCalculationLog SolarCalculationLog { get; set; }
         public int? AdminUserId { get; set; }
         public AdminUser AdminUser { get; set; }
+        public int? AdminTrackedProjectId { get; set; }
+        public AdminTrackedProject AdminTrackedProject { get; set; }
         public string PayloadJson { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DocumentVerification Verification { get; set; }
     }
 }

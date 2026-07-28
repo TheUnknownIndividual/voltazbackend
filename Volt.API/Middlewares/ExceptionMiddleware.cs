@@ -25,11 +25,11 @@ namespace Volt.API.Middlewares
             {
                 _logger.LogError(ex, "Gözlənilməz xəta baş verdi.");
 
-                await HandleExceptionAsync(context, ex);
+                await HandleExceptionAsync(context);
             }
         }
 
-        private static Task HandleExceptionAsync(HttpContext context, Exception ex)
+        private static Task HandleExceptionAsync(HttpContext context)
         {
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError; // 500
@@ -37,7 +37,7 @@ namespace Volt.API.Middlewares
             // Sənin prototipindəki ErrorResponse formatına uyğunlaşdırırıq
             var response = ApiResponse<object>.ErrorResponse(
                 ErrorCode.SERVER_ERROR,
-                ex.Message // Real layihədə bura "Internal Server Error" yazıb, ex.Message-i logda saxlamaq daha təhlükəsizdir
+                "Server Side Error"
             );
 
             return context.Response.WriteAsJsonAsync(response);

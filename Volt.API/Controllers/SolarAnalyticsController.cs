@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using Volt.Application.Dtos.SolarAnalytics;
 using Volt.Application.Interfaces;
@@ -33,10 +34,12 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.LogPdfExportAsync(request, GetAdminUserId(), ct));
 
         [HttpPost("public/calculation")]
+        [EnableRateLimiting("public-write")]
         public async Task<IActionResult> LogPublicCalculation([FromBody] PublicSolarTrackingRequest request, CancellationToken ct)
             => CreateActionResult(await _service.LogPublicCalculationAsync(request, ct));
 
         [HttpPost("public/whatsapp-click")]
+        [EnableRateLimiting("public-write")]
         public async Task<IActionResult> LogPublicWhatsappClick([FromBody] PublicSolarTrackingRequest request, CancellationToken ct)
             => CreateActionResult(await _service.LogPublicWhatsappClickAsync(request, ct));
 

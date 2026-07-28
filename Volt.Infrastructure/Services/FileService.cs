@@ -15,7 +15,7 @@ namespace Volt.Infrastructure.Services
 
         private static readonly HashSet<string> PdfExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".pdf"
+            ".pdf", ".docx"
         };
 
         private readonly FtpOptions _ftpOptions;

@@ -65,7 +65,7 @@ namespace Volt.Application.Services
 
                 return ApiResponse<PromotionDto>.ErrorResponse(
                     ErrorCode.SERVER_ERROR,
-                    ex.Message);
+                    "Server Side Error");
             }
         }
 

@@ -40,5 +40,6 @@ namespace Volt.Application.Dtos.SolarAnalytics
         string ProjectName,
         string DocumentNumber,
         string DocumentCode,
-        DateTime CreatedAt);
+        DateTime CreatedAt,
+        string PayloadJson);
 }

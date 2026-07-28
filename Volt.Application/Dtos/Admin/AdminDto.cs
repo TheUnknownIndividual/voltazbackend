@@ -7,5 +7,18 @@ using Volt.Domain.Enums;
 
 namespace Volt.Application.Dtos.Admin
 {
-    public sealed record AdminDto(int Id, string Username, Role Role, bool IsActive);
+    public sealed record AdminDto(
+        int Id,
+        string Username,
+        string DisplayName,
+        Role Role,
+        bool IsActive,
+        bool IsSuperAdmin,
+        bool CanDeleteProjects,
+        bool CanEditProjects,
+        bool CanApproveWarehouseMovements,
+        bool IsStakeholder,
+        bool HasSalary,
+        long? TelegramChatId,
+        IReadOnlyList<AdminPage> AllowedPages);
 }

@@ -65,7 +65,7 @@ namespace Volt.Application.Services
 
                 return ApiResponse<ProductCategoryDto>.ErrorResponse(
                     ErrorCode.SERVER_ERROR,
-                    ex.Message);
+                    "Server Side Error");
             }
         }
         public async Task<ApiResponse<IReadOnlyList<ProductCategoryDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default)

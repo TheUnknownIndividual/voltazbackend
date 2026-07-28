@@ -82,7 +82,7 @@ namespace Volt.Application.Services
             }
             catch (Exception ex)
             {
-                return ApiResponse<ProductDto>.ErrorResponse(ErrorCode.SERVER_ERROR, ex.Message);
+                return ApiResponse<ProductDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "Server Side Error");
             }
         }
 
@@ -178,15 +178,7 @@ namespace Volt.Application.Services
             }
 
             var productIds = allProducts.Select(x => x.Id).ToHashSet();
-            var allImages = await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
             var allParametrs = await _uow.Repository<ProductParametr>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId) && x.IsActive, ct);
-            var allDescriptions = await _uow.Repository<ProductDescription>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
-            var descriptionIds = allDescriptions.Select(x => x.Id).ToHashSet();
-            var allDescriptionLanguages = descriptionIds.Count == 0
-                ? new List<ProductDescriptionLanguage>()
-                : await _uow.Repository<ProductDescriptionLanguage>().ListNoTrackingAsync(
-                    x => descriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
-            var promotionIdsByProduct = await GetActivePromotionIdsByProductAsync(productIds, ct);
 
             var stockStatus = dto?.StockStatus ?? ProductStockStatus.All;
             var products = allProducts
@@ -202,14 +194,23 @@ namespace Volt.Application.Services
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
+            var pagedProductIds = pagedProducts.Select(x => x.Id).ToHashSet();
+            var pageImages = await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => pagedProductIds.Contains(x.ProductId), ct);
+            var pageDescriptions = await _uow.Repository<ProductDescription>().ListNoTrackingAsync(x => pagedProductIds.Contains(x.ProductId), ct);
+            var pageDescriptionIds = pageDescriptions.Select(x => x.Id).ToHashSet();
+            var pageDescriptionLanguages = pageDescriptionIds.Count == 0
+                ? new List<ProductDescriptionLanguage>()
+                : await _uow.Repository<ProductDescriptionLanguage>().ListNoTrackingAsync(
+                    x => pageDescriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
+            var promotionIdsByProduct = await GetActivePromotionIdsByProductAsync(pagedProductIds, ct);
 
             var items = pagedProducts
                 .Select(x => MapToDto(
                     x,
-                    allImages.Where(i => i.ProductId == x.Id),
+                    pageImages.Where(i => i.ProductId == x.Id),
                     allParametrs.Where(p => p.ProductId == x.Id),
-                    allDescriptions.Where(d => d.ProductId == x.Id),
-                    allDescriptionLanguages,
+                    pageDescriptions.Where(d => d.ProductId == x.Id),
+                    pageDescriptionLanguages,
                     promotionIdsByProduct.GetValueOrDefault(x.Id, [])))
                 .ToList();
 

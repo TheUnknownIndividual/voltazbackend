@@ -14,9 +14,13 @@ namespace Volt.Infrastructure.Data
         {
         }
         public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
+        public DbSet<AdminTelegramConnectionToken> AdminTelegramConnectionTokens => Set<AdminTelegramConnectionToken>();
+        public DbSet<AdminPagePermission> AdminPagePermissions => Set<AdminPagePermission>();
+        public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
         public DbSet<CustomerUser> CustomerUsers => Set<CustomerUser>();
         public DbSet<CustomerExternalLogin> CustomerExternalLogins => Set<CustomerExternalLogin>();
         public DbSet<CustomerPasskeyCredential> CustomerPasskeyCredentials => Set<CustomerPasskeyCredential>();
+        public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
         public DbSet<About> Abouts { get; set; }
         public DbSet<AboutLanguage> AboutLanguages { get; set; }
         public DbSet<Step> Steps { get; set; }
@@ -41,6 +45,20 @@ namespace Volt.Infrastructure.Data
         public DbSet<Project> Projects { get; set; }
         public DbSet<ProjectLanguage> ProjectLanguages { get; set; }
         public DbSet<ProjectImage> ProjectImages { get; set; }
+        public DbSet<ProjectAttachment> ProjectAttachments { get; set; }
+        public DbSet<ProjectOffer> ProjectOffers { get; set; }
+        public DbSet<AdminTrackedProject> AdminTrackedProjects { get; set; }
+        public DbSet<AdminTrackedProjectOffer> AdminTrackedProjectOffers { get; set; }
+        public DbSet<AdminTrackedProjectAttachment> AdminTrackedProjectAttachments { get; set; }
+        public DbSet<StakeholderApprovalRequest> StakeholderApprovalRequests => Set<StakeholderApprovalRequest>();
+        public DbSet<StakeholderApprovalRecipient> StakeholderApprovalRecipients => Set<StakeholderApprovalRecipient>();
+        public DbSet<ExecutionProject> ExecutionProjects => Set<ExecutionProject>();
+        public DbSet<ExecutionProjectStaff> ExecutionProjectStaff => Set<ExecutionProjectStaff>();
+        public DbSet<ExecutionProjectExternalWorker> ExecutionProjectExternalWorkers => Set<ExecutionProjectExternalWorker>();
+        public DbSet<ExecutionProjectExpense> ExecutionProjectExpenses => Set<ExecutionProjectExpense>();
+        public DbSet<ExecutionProjectBoqItem> ExecutionProjectBoqItems => Set<ExecutionProjectBoqItem>();
+        public DbSet<ExecutionWarehouseMovement> ExecutionWarehouseMovements => Set<ExecutionWarehouseMovement>();
+        public DbSet<ExecutionProjectTask> ExecutionProjectTasks => Set<ExecutionProjectTask>();
         public DbSet<ProductCategory> ProductCategories { get; set; }
         public DbSet<ProductCategoryLanguage> ProductCategoryLanguages { get; set; }
         public DbSet<ProductSubCategory> ProductSubCategories { get; set; }
@@ -55,10 +73,14 @@ namespace Volt.Infrastructure.Data
         public DbSet<ProductDescription> ProductDescriptions { get; set; }
         public DbSet<ProductDescriptionLanguage> ProductDescriptionLanguages { get; set; }
         public DbSet<ProductPromotion> ProductPromotions { get; set; }
+        public DbSet<SolarInverterSpecification> SolarInverterSpecifications { get; set; }
+        public DbSet<SolarInverterDatasheetDocument> SolarInverterDatasheetDocuments { get; set; }
         public DbSet<SolarSalesProject> SolarSalesProjects { get; set; }
         public DbSet<SolarCalculationLog> SolarCalculationLogs { get; set; }
         public DbSet<DocumentSequence> DocumentSequences { get; set; }
         public DbSet<DocumentLog> DocumentLogs { get; set; }
+        public DbSet<DocumentVerification> DocumentVerifications { get; set; }
+        public DbSet<DocumentVerificationInquiry> DocumentVerificationInquiries { get; set; }
         public DbSet<Order> Orders { get; set; }
         public DbSet<OrderItem> OrderItems { get; set; }
 

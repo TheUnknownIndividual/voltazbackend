@@ -10,7 +10,18 @@ namespace Volt.Application.Dtos.Project
         int AnnualProduction,
         byte AnnualProductionType,
         byte SystemType,
+        string? ContactFullName,
+        string? ContactPhone,
+        DateTime? ProjectDate,
+        DateTime? InquiryReceivedAt,
+        DateTime? OfferSentAt,
+        DateTime? ResponseExpectedAt,
+        string? CurrentStatus,
+        string? ShortNote,
+        decimal? OfferAmountAzn,
         IReadOnlyList<ProjectLanguageDto> Languages,
-        IReadOnlyList<ProjectImageDto> Images
+        IReadOnlyList<ProjectImageDto> Images,
+        IReadOnlyList<ProjectAttachmentDto> Attachments,
+        IReadOnlyList<ProjectOfferDto> Offers
     );
 }

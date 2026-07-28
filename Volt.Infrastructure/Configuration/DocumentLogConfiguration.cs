@@ -42,10 +42,16 @@ namespace Volt.Infrastructure.Configuration
                 .HasForeignKey(x => x.AdminUserId)
                 .OnDelete(DeleteBehavior.NoAction);
 
+            builder.HasOne(x => x.AdminTrackedProject)
+                .WithMany()
+                .HasForeignKey(x => x.AdminTrackedProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.HasIndex(x => x.DocumentNumber)
                 .IsUnique();
             builder.HasIndex(x => x.CreatedAt);
             builder.HasIndex(x => x.SolarSalesProjectId);
+            builder.HasIndex(x => x.AdminTrackedProjectId);
         }
     }
 }

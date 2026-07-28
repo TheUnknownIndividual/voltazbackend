@@ -15,6 +15,8 @@ namespace Volt.Application.Dtos.SolarAnalytics
         [MaxLength(100)]
         public string SessionId { get; set; }
 
+        public int AdminTrackedProjectId { get; set; }
+
         public JsonElement Payload { get; set; }
     }
 }

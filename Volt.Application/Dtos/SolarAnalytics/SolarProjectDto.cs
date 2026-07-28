@@ -4,5 +4,7 @@ namespace Volt.Application.Dtos.SolarAnalytics
         int Id,
         string Name,
         DateTime CreatedAt,
-        DateTime? UpdatedAt);
+        DateTime? UpdatedAt,
+        string LatestPayloadJson,
+        int? AdminTrackedProjectId);
 }

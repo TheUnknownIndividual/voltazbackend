@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Caching.Memory;
 using Volt.Application.Interfaces;
 using Volt.Domain.Entities;
@@ -32,9 +34,12 @@ namespace Volt.Application.Services
             }
 
             var catalog = await GetCatalogAsync(ct);
+            var standalonePowerWatts = ParseStandalonePowerQueryWatts(query);
             return catalog.Documents
                 .Where(x => (categoryId == null || x.Product.ProductCategoryId == categoryId)
-                    && (subCategoryId == null || x.Product.ProductSubCategoryId == subCategoryId))
+                    && (subCategoryId == null || x.Product.ProductSubCategoryId == subCategoryId)
+                    && (!standalonePowerWatts.HasValue
+                        || HasEquivalentTechnicalPower(x.Parametrs, standalonePowerWatts.Value)))
                 .Select(x => new
                 {
                     Document = x,
@@ -152,7 +157,7 @@ namespace Volt.Application.Services
                             : string.Empty,
                         categoryNamesById.GetValueOrDefault(product.ProductCategoryId, Array.Empty<string>()),
                         subCategoryNamesById.GetValueOrDefault(product.ProductSubCategoryId, Array.Empty<string>()),
-                        productParametrs.Select(x => x.TechnicalPower ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToList(),
+                        BuildTechnicalPowerSearchValues(productParametrs),
                         productDescriptionLanguages.Select(x => x.Description ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToList(),
                         productDescriptionLanguages.Select(x => x.Features ?? string.Empty).Where(x => !string.IsNullOrWhiteSpace(x)).ToList());
                 })
@@ -224,11 +229,12 @@ namespace Volt.Application.Services
             AddScore(ProductSearchHelper.ScoreText(document.TechnologyName, query, 55, 35, 38), true);
             AddScore(ScoreBest(document.CategoryNames, query, 50, 35, 32), true);
             AddScore(ScoreBest(document.SubCategoryNames, query, 50, 35, 32), true);
-            AddScore(ScoreBest(document.TechnicalPowerValues, query, 80, 55, 25), true, 100);
+            AddScore(ScoreBest(document.TechnicalPowerValues, query, 80, 55, 40), true, 120);
             AddScore(ScoreBest(document.Features, query, 55, 35, 18), true, 65);
             AddScore(ScoreBest(document.DescriptionTexts, query, 45, 35, 12), false, 75);
 
-            if (query.NumericQuery.HasValue && HasExactNumericMatch(document.Parametrs, query.NumericQuery.Value))
+            if (query.NumericQuery.HasValue
+                && HasExactTechnicalPowerMatch(document.TechnicalPowerValues, query.NumericQuery.Value))
             {
                 score += 70;
                 foreach (var index in query.Terms.Where(x => x.Token.Any(char.IsDigit)).Select(x => x.Index))
@@ -257,11 +263,90 @@ namespace Volt.Application.Services
                 .FirstOrDefault() ?? ProductSearchTextScore.Empty;
         }
 
-        private static bool HasExactNumericMatch(IEnumerable<ProductParametr> parametrs, decimal numericQuery)
+        private static IReadOnlyList<string> BuildTechnicalPowerSearchValues(
+            IEnumerable<ProductParametr> parametrs)
+        {
+            var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var rawValue in parametrs
+                         .Select(x => x.TechnicalPower?.Trim())
+                         .Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                values.Add(rawValue!);
+                if (!TryParseWatts(rawValue!, out var watts))
+                {
+                    continue;
+                }
+
+                values.Add($"{FormatPower(watts)} W");
+                values.Add($"{FormatPower(watts)}W");
+                if (watts >= 1_000)
+                {
+                    values.Add($"{FormatPower(watts / 1_000m)} kW");
+                    values.Add($"{FormatPower(watts / 1_000m)}kW");
+                }
+            }
+
+            return values.ToList();
+        }
+
+        private static bool HasExactTechnicalPowerMatch(
+            IEnumerable<string> technicalPowerValues,
+            decimal numericQuery)
+            => technicalPowerValues.Any(value =>
+                Regex.Matches(value, @"\d+(?:[.,]\d+)?")
+                    .Select(match => decimal.TryParse(
+                        match.Value.Replace(',', '.'),
+                        NumberStyles.Number,
+                        CultureInfo.InvariantCulture,
+                        out var parsed) ? parsed : (decimal?)null)
+                    .Any(parsed => parsed == numericQuery));
+
+        private static bool TryParseWatts(string value, out decimal watts)
+        {
+            watts = 0;
+            var match = Regex.Match(
+                value,
+                @"^\s*(?<value>\d+(?:[.,]\d+)?)\s*(?<unit>kw|w)?\s*$",
+                RegexOptions.IgnoreCase);
+            if (!match.Success
+                || !decimal.TryParse(
+                    match.Groups["value"].Value.Replace(',', '.'),
+                    NumberStyles.Number,
+                    CultureInfo.InvariantCulture,
+                    out var parsed))
+            {
+                return false;
+            }
+
+            watts = match.Groups["unit"].Value.Equals("kw", StringComparison.OrdinalIgnoreCase)
+                ? parsed * 1_000m
+                : parsed;
+            return watts > 0;
+        }
+
+        private static decimal? ParseStandalonePowerQueryWatts(string value)
+        {
+            if (!Regex.IsMatch(
+                    value ?? string.Empty,
+                    @"^\s*\d+(?:[.,]\d+)?\s*(?:kw|w)\s*$",
+                    RegexOptions.IgnoreCase))
+            {
+                return null;
+            }
+
+            return TryParseWatts(value, out var watts) ? watts : null;
+        }
+
+        private static bool HasEquivalentTechnicalPower(
+            IEnumerable<ProductParametr> parametrs,
+            decimal watts)
             => parametrs.Any(x =>
-                (decimal.Truncate(numericQuery) == numericQuery && x.Count == (int)numericQuery)
-                || x.Amount == numericQuery
-                || x.Effectiveness == numericQuery);
+                !string.IsNullOrWhiteSpace(x.TechnicalPower)
+                && TryParseWatts(x.TechnicalPower, out var variantWatts)
+                && variantWatts == watts);
+
+        private static string FormatPower(decimal value)
+            => value.ToString("0.###", CultureInfo.InvariantCulture);
 
         private static bool MeetsThreshold(
             ProductSearchQuery query,

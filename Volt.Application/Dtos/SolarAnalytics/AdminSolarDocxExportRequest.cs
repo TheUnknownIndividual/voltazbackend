@@ -7,5 +7,6 @@ namespace Volt.Application.Dtos.SolarAnalytics
         [Required]
         [MaxLength(10)]
         public string DocumentCode { get; set; }
+
     }
 }

@@ -15,6 +15,35 @@ REMOTE_DIR="${REMOTE_DIR:-/apivoltaz}"
 : "${FTP_PASS:?Set FTP_PASS before running this script.}"
 : "${FTP_HOST:?Set FTP_HOST before running this script.}"
 
+# Optional production-only Telegram configuration. These values are written to
+# telegram.production.json in the API root, never appsettings.json or the
+# frontend bundle. The remote file remains in place during later normal FTP
+# deploys, because mirror does not delete files absent from a new publish.
+TELEGRAM_CONFIG_COUNT=0
+for name in TELEGRAM_BOT_TOKEN TELEGRAM_BOT_USERNAME TELEGRAM_BOT_LINK_KEY; do
+  if [ -n "${!name:-}" ]; then
+    TELEGRAM_CONFIG_COUNT=$((TELEGRAM_CONFIG_COUNT + 1))
+  fi
+done
+
+if [ "$TELEGRAM_CONFIG_COUNT" -ne 0 ] && [ "$TELEGRAM_CONFIG_COUNT" -ne 3 ]; then
+  echo "Set TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, and TELEGRAM_BOT_LINK_KEY together." >&2
+  exit 1
+fi
+
+if [ "$TELEGRAM_CONFIG_COUNT" -eq 3 ]; then
+  # Restrict values to the character sets used by BotFather tokens, Telegram
+  # usernames, and a hex shared key before writing JSON without interpolation.
+  [[ "$TELEGRAM_BOT_TOKEN" =~ ^[A-Za-z0-9_:-]+$ ]] || { echo "Invalid TELEGRAM_BOT_TOKEN format." >&2; exit 1; }
+  [[ "$TELEGRAM_BOT_USERNAME" =~ ^[A-Za-z0-9_]+$ ]] || { echo "Invalid TELEGRAM_BOT_USERNAME format." >&2; exit 1; }
+  [[ "$TELEGRAM_BOT_LINK_KEY" =~ ^[A-Fa-f0-9]{32,}$ ]] || { echo "TELEGRAM_BOT_LINK_KEY must be a 32+ character hexadecimal value." >&2; exit 1; }
+fi
+
+if [ -n "${ASPNETCORE_ENVIRONMENT:-}" ] && [[ ! "$ASPNETCORE_ENVIRONMENT" =~ ^(Development|Staging|Production)$ ]]; then
+  echo "Invalid ASPNETCORE_ENVIRONMENT." >&2
+  exit 1
+fi
+
 command -v dotnet >/dev/null || {
   echo "dotnet is required but was not found in PATH." >&2
   exit 1
@@ -54,6 +83,22 @@ dotnet publish "$PROJECT_PATH" \
   --output "$PUBLISH_DIR" \
   /p:UseAppHost=false
 
+if [ -n "${ASPNETCORE_ENVIRONMENT:-}" ]; then
+  export ASPNETCORE_ENVIRONMENT
+  perl -0pi -e '
+    my $variables = qq{\n        <environmentVariables>\n          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="$ENV{ASPNETCORE_ENVIRONMENT}" />\n        </environmentVariables>\n      };
+    s{(<aspNetCore\b[^>]*?)\s*/>}{$1>$variables</aspNetCore>}s
+      or die "Could not add ASPNETCORE_ENVIRONMENT to web.config\n";
+  ' "$PUBLISH_DIR/web.config"
+fi
+
+if [ "$TELEGRAM_CONFIG_COUNT" -eq 3 ]; then
+  echo "Adding Telegram production configuration to the publish output..."
+  printf '{\n  "TelegramBot": {\n    "BotToken": "%s",\n    "BotUsername": "%s",\n    "LinkApiKey": "%s"\n  }\n}\n' \
+    "$TELEGRAM_BOT_TOKEN" "$TELEGRAM_BOT_USERNAME" "$TELEGRAM_BOT_LINK_KEY" \
+    > "$PUBLISH_DIR/telegram.production.json"
+fi
+
 echo "Upload preview:"
 if [ ! -d "$PUBLISH_DIR" ]; then
   echo "Publish directory does not exist after dotnet publish: $PUBLISH_DIR" >&2
@@ -62,11 +107,16 @@ fi
 
 find "$PUBLISH_DIR" -maxdepth 2 -type f | sed "s#^$PUBLISH_DIR/##" | sort
 
+APP_OFFLINE_FILE="$PUBLISH_DIR/app_offline.htm"
+printf '%s\n' 'Volt API is updating. Please retry in a moment.' > "$APP_OFFLINE_FILE"
+
 echo "Mirroring publish output to $FTP_HOST:$REMOTE_DIR..."
 lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<LFTP_COMMANDS
 set ftp:ssl-allow no
+put "$APP_OFFLINE_FILE" -o "$REMOTE_DIR/app_offline.htm"
+sleep 10
 lcd "$PUBLISH_DIR"
-mirror -R --only-newer --no-perms --verbose \
+mirror -R --upload-older --no-perms --verbose \
   --exclude-glob .git \
   --exclude-glob .git/** \
   --exclude-glob .github \
@@ -88,6 +138,7 @@ mirror -R --only-newer --no-perms --verbose \
   --exclude-glob '*.http' \
   --exclude-glob '*.log' \
   . "$REMOTE_DIR"
+rm "$REMOTE_DIR/app_offline.htm"
 bye
 LFTP_COMMANDS
 

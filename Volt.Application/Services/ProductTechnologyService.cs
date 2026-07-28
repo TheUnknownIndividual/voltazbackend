@@ -40,7 +40,7 @@ namespace Volt.Application.Services
             }
             catch (Exception ex)
             {
-                return ApiResponse<ProductTechnologyDto>.ErrorResponse(ErrorCode.SERVER_ERROR, ex.Message);
+                return ApiResponse<ProductTechnologyDto>.ErrorResponse(ErrorCode.SERVER_ERROR, "Server Side Error");
             }
         }
 

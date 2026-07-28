@@ -5,11 +5,15 @@ using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Text;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 using Volt.API.Services;
 using Volt.Application.Configuration;
 using Volt.API.Infrastructure.Filters;
 using Volt.API.Infrastructure.Localization;
 using Volt.API.Middlewares;
+using Volt.Application.Dtos;
+using Volt.Application.Dtos.SolarInverter;
 using Volt.Application.Interfaces;
 using Volt.Application.Security;
 using Volt.Application.Services;
@@ -23,14 +27,103 @@ namespace Volt.API
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+
+            // HttpClient's default information logs include the Telegram endpoint path,
+            // which contains the bot token. Keep this client at warning level; our own
+            // warning logs record only safe delivery diagnostics.
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.ITelegramTaskNotificationService", LogLevel.Warning);
+
+            // This optional file is provisioned only on the production server
+            // by the FTP deploy script. It keeps Telegram integration secrets
+            // outside source-controlled appsettings files. Environment variables
+            // are added afterwards so an IIS/server setting always takes priority.
+            builder.Configuration
+                .AddJsonFile("telegram.production.json", optional: true, reloadOnChange: false)
+                .AddEnvironmentVariables();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddMemoryCache();
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"customer-auth:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 500,
+                        Window = TimeSpan.FromMinutes(5),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("admin-auth", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"admin-auth:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 500,
+                        Window = TimeSpan.FromMinutes(5),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("public-write", context => RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientAddress(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 500,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("verification-read", context => RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientAddress(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 500,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("protected-write", context => RateLimitPartition.GetFixedWindowLimiter(
+                    GetClientAddress(context),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 500,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.ContentType = "application/json";
+                    await context.HttpContext.Response.WriteAsJsonAsync(
+                        ApiResponse<object>.ErrorResponse("RATE_LIMITED", "Too many requests. Please try again later."),
+                        cancellationToken);
+                };
+            });
+
+            var allowedOrigins = builder.Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("frontend", policy =>
+                {
+                    policy.WithOrigins(allowedOrigins)
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials();
+                });
+            });
 
             builder.Services.AddDbContext<DataContext>(options =>
                 options.UseSqlServer(
@@ -40,7 +133,13 @@ namespace Volt.API
             builder.Services.AddScoped<PasswordHelper>();
             builder.Services.AddScoped<IAdminAuthService, AdminAuthService>();
             builder.Services.AddScoped<ICustomerAuthService, CustomerAuthService>();
+            builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+            builder.Services.AddScoped<AuthCookieService>();
             builder.Services.AddScoped<IAdminService, AdminService>();
+            builder.Services.AddScoped<IAdminAuditService, AdminAuditService>();
+            builder.Services.AddScoped<IAdminAccessService, AdminAccessService>();
+            builder.Services.AddScoped<IDocumentVerificationService, DocumentVerificationService>();
+            builder.Services.AddScoped<IDocumentVerificationInquiryService, DocumentVerificationInquiryService>();
 
             builder.Services.Configure<FtpOptions>(builder.Configuration.GetSection("FtpOptions"));
 
@@ -58,6 +157,16 @@ namespace Volt.API
             builder.Services.AddScoped<IBlogService, BlogService>();
             builder.Services.AddScoped<INewsPostService, NewsPostService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
+            builder.Services.AddScoped<IAdminProjectTrackerService, AdminProjectTrackerService>();
+            builder.Services.AddScoped<IExecutionProjectService, ExecutionProjectService>();
+            builder.Services.AddScoped<IAccountingService, AccountingService>();
+            builder.Services.AddScoped<IAdminTelegramConnectionService, AdminTelegramConnectionService>();
+            builder.Services.Configure<TelegramBotOptions>(builder.Configuration.GetSection("TelegramBot"));
+            builder.Services.AddHttpClient<ITelegramTaskNotificationService, TelegramTaskNotificationService>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.telegram.org/");
+                client.Timeout = TimeSpan.FromSeconds(5);
+            });
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
             builder.Services.Configure<SeoOptions>(builder.Configuration.GetSection("Seo"));
             builder.Services.AddHttpClient("seo");
@@ -74,6 +183,21 @@ namespace Volt.API
             builder.Services.AddScoped<ISearchService, SearchService>();
             builder.Services.AddScoped<IPromotionService, PromotionService>();
             builder.Services.AddScoped<ISolarAnalyticsService, SolarAnalyticsService>();
+            builder.Services.Configure<SolarInverterOcrOptions>(
+                builder.Configuration.GetSection("SolarInverterOcr"));
+            builder.Services.AddSingleton<ISolarInverterDatasheetParser, SolarInverterDatasheetParser>();
+            builder.Services.Configure<SolarInverterPromotionOptions>(
+                builder.Configuration.GetSection("SolarInverterPromotion"));
+            builder.Services.AddScoped<
+                ISolarInverterProductionPromotionService,
+                SolarInverterProductionPromotionService>();
+            builder.Services.AddScoped<
+                ISolarInverterDatasheetQaService,
+                SolarInverterDatasheetQaService>();
+            builder.Services.AddHttpClient<ISolarInverterService, SolarInverterService>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
             builder.Services.AddScoped<IOrderService, OrderService>();
             builder.Services.AddScoped<IOrderEmailService, OrderEmailService>();
 
@@ -88,6 +212,8 @@ namespace Volt.API
                         ValidateIssuer = true,
                         ValidateAudience = true,
                         ValidateLifetime = true,
+                        RequireExpirationTime = true,
+                        ClockSkew = TimeSpan.FromSeconds(30),
                         ValidateIssuerSigningKey = true,
                         ValidIssuer = builder.Configuration["TokenOptions:Issuer"],
                         ValidAudience = builder.Configuration["TokenOptions:Audience"],
@@ -105,6 +231,70 @@ namespace Volt.API
             });
             var app = builder.Build();
 
+            if (args.Contains("--import-solar-inverter-datasheets", StringComparer.OrdinalIgnoreCase))
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                var service = scope.ServiceProvider.GetRequiredService<ISolarInverterService>();
+                var commit = args.Contains("--commit", StringComparer.OrdinalIgnoreCase);
+                var response = await service.ImportDatasheetsAsync(
+                    new SolarInverterDatasheetImportRequest
+                    {
+                        DryRun = !commit,
+                        Force = args.Contains("--force", StringComparer.OrdinalIgnoreCase),
+                        RebuildStaging = args.Contains(
+                            "--rebuild-staging",
+                            StringComparer.OrdinalIgnoreCase)
+                    });
+                Console.WriteLine(JsonSerializer.Serialize(response));
+                return;
+            }
+
+            if (args.Contains("--check-solar-inverter-qa", StringComparer.OrdinalIgnoreCase))
+            {
+                await using var scope = app.Services.CreateAsyncScope();
+                var qaService = scope.ServiceProvider
+                    .GetRequiredService<ISolarInverterDatasheetQaService>();
+                var dataContext = scope.ServiceProvider.GetRequiredService<DataContext>();
+                var listResponse = await qaService.GetListAsync(
+                    null,
+                    null,
+                    1,
+                    1);
+                var detailResponse = listResponse.Success &&
+                                     listResponse.Data.Items.Count > 0
+                    ? await qaService.GetDetailAsync(
+                        listResponse.Data.Items[0].SpecificationId)
+                    : null;
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    listResponse.Success,
+                    TotalCount = listResponse.Data?.TotalCount,
+                    DetailLoaded = detailResponse?.Success ?? false,
+                    SourceLinked = detailResponse?.Data?.SourceUrl is not null,
+                    ExtractedCharacters =
+                        detailResponse?.Data?.OriginalExtractedText.Length ?? 0,
+                    SourceImageCount = detailResponse?.Data?.SourceUrls.Count ?? 0,
+                    Documents = await dataContext.SolarInverterDatasheetDocuments
+                        .AsNoTracking()
+                        .GroupBy(x => x.DocumentKind)
+                        .Select(x => new { Kind = x.Key, Count = x.Count() })
+                        .ToListAsync(),
+                    CertificateDocuments =
+                        await dataContext.SolarInverterDatasheetDocuments
+                            .AsNoTracking()
+                            .CountAsync(x =>
+                                x.DocumentKind == "certificate" ||
+                                x.ExtractedText.Contains("certificate of conformity"))
+                }));
+                return;
+            }
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
+                dbContext.Database.Migrate();
+            }
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
@@ -116,14 +306,32 @@ namespace Volt.API
 
             app.UseHttpsRedirection();
             
-            app.UseCors(x => x.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+            app.UseCors("frontend");
 
+            app.UseRateLimiter();
             app.UseAuthentication();
+            app.UseMiddleware<AdminPageAuthorizationMiddleware>();
             app.UseAuthorization();
+            app.UseMiddleware<AdminWriteAuditMiddleware>();
 
             app.MapControllers();
 
-            app.Run();
+            await app.RunAsync();
+        }
+
+        private static string GetClientAddress(HttpContext context)
+        {
+            foreach (var headerName in new[] { "CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP" })
+            {
+                var value = context.Request.Headers[headerName].FirstOrDefault();
+                var forwardedAddress = value?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (System.Net.IPAddress.TryParse(forwardedAddress, out _))
+                {
+                    return forwardedAddress;
+                }
+            }
+
+            return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         }
     }
 }

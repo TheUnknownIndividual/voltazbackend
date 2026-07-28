@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Volt.Application.Dtos.PartnershipRequest;
 using Volt.Application.Interfaces;
 
@@ -27,6 +28,7 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.GetByIdAsync(id, ct));
 
         [HttpPost]
+        [EnableRateLimiting("public-write")]
         public async Task<IActionResult> Create([FromBody] PartnershipRequestCreateRequest request, CancellationToken ct)
             => CreateActionResult(await _service.CreateAsync(request, ct));
 

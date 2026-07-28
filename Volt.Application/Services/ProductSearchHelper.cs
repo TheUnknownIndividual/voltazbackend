@@ -251,9 +251,23 @@ namespace Volt.Application.Services
                 : [token];
 
         private static bool IsTokenMatch(string valueToken, string queryToken)
-            => valueToken == queryToken
-                || (queryToken.Length > 2 && valueToken.Contains(queryToken))
+        {
+            if (valueToken == queryToken)
+            {
+                return true;
+            }
+
+            // Partial numeric matches make variant searches unsafe: for example,
+            // 100 matched 10000 and 110 matched 11000. Unit/model tokens such as
+            // AC400V can still use the normal text matching behavior.
+            if (valueToken.All(char.IsDigit) || queryToken.All(char.IsDigit))
+            {
+                return false;
+            }
+
+            return (queryToken.Length > 2 && valueToken.Contains(queryToken))
                 || (valueToken.Length > 2 && queryToken.Contains(valueToken));
+        }
     }
 
     internal sealed record ProductSearchQuery(

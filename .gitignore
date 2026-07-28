@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /Volt.sln
+
+/secrets 
+/Volt.API/appsettings.Development.json

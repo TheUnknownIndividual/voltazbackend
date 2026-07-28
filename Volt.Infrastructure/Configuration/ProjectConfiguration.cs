@@ -22,12 +22,37 @@ namespace Volt.Infrastructure.Configuration
             builder.Property(x => x.UpdatedAt)
                 .IsRequired(false);
 
+            builder.Property(x => x.ContactFullName)
+                .HasMaxLength(120);
+
+            builder.Property(x => x.ContactPhone)
+                .HasMaxLength(40);
+
+            builder.Property(x => x.CurrentStatus)
+                .HasMaxLength(80);
+
+            builder.Property(x => x.ShortNote)
+                .HasMaxLength(140);
+
+            builder.Property(x => x.OfferAmountAzn)
+                .HasColumnType("decimal(18,2)");
+
             builder.HasMany(x => x.Languages)
                 .WithOne(x => x.Project)
                 .HasForeignKey(x => x.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasMany(x => x.Images)
+                .WithOne(x => x.Project)
+                .HasForeignKey(x => x.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(x => x.Attachments)
+                .WithOne(x => x.Project)
+                .HasForeignKey(x => x.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(x => x.Offers)
                 .WithOne(x => x.Project)
                 .HasForeignKey(x => x.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);

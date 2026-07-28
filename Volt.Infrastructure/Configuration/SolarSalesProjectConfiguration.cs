@@ -32,6 +32,13 @@ namespace Volt.Infrastructure.Configuration
 
             builder.HasIndex(x => x.NormalizedName)
                 .IsUnique();
+
+            builder.HasOne(x => x.AdminTrackedProject)
+                .WithMany()
+                .HasForeignKey(x => x.AdminTrackedProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.HasIndex(x => x.AdminTrackedProjectId);
         }
     }
 }

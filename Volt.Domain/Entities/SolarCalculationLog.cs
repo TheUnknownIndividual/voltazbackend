@@ -9,6 +9,8 @@ namespace Volt.Domain.Entities
         public SolarSalesProject SolarSalesProject { get; set; }
         public int? AdminUserId { get; set; }
         public AdminUser AdminUser { get; set; }
+        public int? AdminTrackedProjectId { get; set; }
+        public AdminTrackedProject AdminTrackedProject { get; set; }
         public string Language { get; set; }
         public string SessionId { get; set; }
         public string PayloadJson { get; set; }

@@ -119,8 +119,8 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<CustomerAuthResponse>> LoginWithGoogleAsync(SocialTokenLoginRequest request, CancellationToken ct = default)
         {
-            var clientId = _configuration["Authentication:Google:ClientId"];
-            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(request?.IdToken))
+            var clientIds = GetConfiguredClientIds("Authentication:Google");
+            if (clientIds.Length == 0 || string.IsNullOrWhiteSpace(request?.IdToken))
             {
                 return ApiResponse<CustomerAuthResponse>.ErrorResponse(ErrorCode.INVALID_EXTERNAL_AUTH_TOKEN, ErrorCode.INVALID_EXTERNAL_AUTH_TOKEN);
             }
@@ -129,7 +129,7 @@ namespace Volt.Application.Services
             {
                 var payload = await GoogleJsonWebSignature.ValidateAsync(
                     request.IdToken,
-                    new GoogleJsonWebSignature.ValidationSettings { Audience = new[] { clientId } });
+                    new GoogleJsonWebSignature.ValidationSettings { Audience = clientIds });
 
                 if (payload is null || payload.EmailVerified != true || string.IsNullOrWhiteSpace(payload.Subject) || string.IsNullOrWhiteSpace(payload.Email))
                 {
@@ -155,8 +155,8 @@ namespace Volt.Application.Services
 
         public async Task<ApiResponse<CustomerAuthResponse>> LoginWithAppleAsync(SocialTokenLoginRequest request, CancellationToken ct = default)
         {
-            var clientId = _configuration["Authentication:Apple:ClientId"];
-            if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(request?.IdToken))
+            var clientIds = GetConfiguredClientIds("Authentication:Apple");
+            if (clientIds.Length == 0 || string.IsNullOrWhiteSpace(request?.IdToken))
             {
                 return ApiResponse<CustomerAuthResponse>.ErrorResponse(ErrorCode.INVALID_EXTERNAL_AUTH_TOKEN, ErrorCode.INVALID_EXTERNAL_AUTH_TOKEN);
             }
@@ -169,7 +169,7 @@ namespace Volt.Application.Services
                     ValidateIssuer = true,
                     ValidIssuer = "https://appleid.apple.com",
                     ValidateAudience = true,
-                    ValidAudience = clientId,
+                    ValidAudiences = clientIds,
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKeys = appleConfig.SigningKeys,
                     ValidateLifetime = true,
@@ -677,6 +677,23 @@ namespace Volt.Application.Services
             using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
             rng.GetBytes(bytes);
             return bytes;
+        }
+
+        private string[] GetConfiguredClientIds(string sectionPath)
+        {
+            var section = _configuration.GetSection(sectionPath);
+            var configuredIds = section
+                .GetSection("ClientIds")
+                .GetChildren()
+                .Select(x => x.Value);
+            var fallbackId = section["ClientId"];
+
+            return configuredIds
+                .Append(fallbackId)
+                .Select(NormalizeNullable)
+                .Where(x => x is not null)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
         }
 
         private static string ValidateRegisterRequest(CustomerRegisterRequest request)

@@ -81,6 +81,8 @@ namespace Volt.Domain.Common
         public const string PROJECT_IMAGE_NOT_FOUND = "Project image not found";
         public const string INVALID_PROJECT_REQUEST = "Invalid project request";
         public const string INVALID_PROJECT_REORDER_REQUEST = "Invalid project reorder request";
+        public const string ADMIN_TRACKED_PROJECT_NOT_FOUND = "Admin tracked project not found";
+        public const string INVALID_ADMIN_TRACKED_PROJECT_REQUEST = "Invalid admin tracked project request";
 
         public const string PRODUCT_CATEGORY_NOT_FOUND = "Product category not found";
         public const string PRODUCT_CATEGORY_LANGUAGE_DUPLICATE = "Duplicate language exists for product category";

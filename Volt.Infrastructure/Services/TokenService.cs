@@ -32,12 +32,11 @@ namespace Volt.Infrastructure.Services
             };
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["TokenOptions:SecurityKey"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
             var token = new JwtSecurityToken(
                 issuer: _config["TokenOptions:Issuer"],
                 audience: _config["TokenOptions:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddDays(1),
+                expires: DateTime.UtcNow.AddMinutes(GetAccessTokenLifetimeMinutes()),
                 signingCredentials: creds
             );
             var tokenstring = new JwtSecurityTokenHandler().WriteToken(token);
@@ -59,17 +58,21 @@ namespace Volt.Infrastructure.Services
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["TokenOptions:SecurityKey"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
             var token = new JwtSecurityToken(
                 issuer: _config["TokenOptions:Issuer"],
                 audience: _config["TokenOptions:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddDays(7),
+                expires: DateTime.UtcNow.AddMinutes(GetAccessTokenLifetimeMinutes()),
                 signingCredentials: creds
             );
 
             var tokenstring = new JwtSecurityTokenHandler().WriteToken(token);
             return new TokenDto(tokenstring);
         }
+
+        private int GetAccessTokenLifetimeMinutes()
+            => int.TryParse(_config["TokenOptions:AccessTokenMinutes"], out var minutes)
+                ? Math.Max(5, minutes)
+                : 60;
     }
 }

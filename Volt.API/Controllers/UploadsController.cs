@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Volt.API.Models;
 using Volt.Application.Dtos;
 using Volt.Application.Interfaces;
@@ -20,6 +21,7 @@ namespace Volt.API.Controllers
 
         [Authorize]
         [HttpPost("image")]
+        [EnableRateLimiting("protected-write")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadImage([FromForm] UploadImageFormRequest form, CancellationToken ct)
         {
@@ -50,6 +52,7 @@ namespace Volt.API.Controllers
 
         [Authorize]
         [HttpPost("pdf")]
+        [EnableRateLimiting("protected-write")]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UploadPdf([FromForm] UploadPdfFormRequest form, CancellationToken ct)
         {
