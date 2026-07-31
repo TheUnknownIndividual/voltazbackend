@@ -82,6 +82,36 @@ namespace Volt.API
                         QueueLimit = 0
                     }));
 
+                options.AddPolicy("public-agent-draft", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"public-agent-draft:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 4,
+                        Window = TimeSpan.FromHours(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("public-agent-confirm", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"public-agent-confirm:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 6,
+                        Window = TimeSpan.FromHours(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("public-agent-status", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"public-agent-status:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(10),
+                        QueueLimit = 0
+                    }));
+
                 options.AddPolicy("verification-read", context => RateLimitPartition.GetFixedWindowLimiter(
                     GetClientAddress(context),
                     _ => new FixedWindowRateLimiterOptions
@@ -158,6 +188,10 @@ namespace Volt.API
             builder.Services.AddScoped<INewsPostService, NewsPostService>();
             builder.Services.AddScoped<IProjectService, ProjectService>();
             builder.Services.AddScoped<IAdminProjectTrackerService, AdminProjectTrackerService>();
+            builder.Services.AddHttpClient<IProjectAttachmentDocumentExtractor, ProjectAttachmentDocumentExtractor>(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(20);
+            }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
             builder.Services.AddScoped<IExecutionProjectService, ExecutionProjectService>();
             builder.Services.AddScoped<IAccountingService, AccountingService>();
             builder.Services.AddScoped<IAdminTelegramConnectionService, AdminTelegramConnectionService>();
@@ -180,6 +214,8 @@ namespace Volt.API
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();
             builder.Services.AddHostedService<SeoSubmissionBackgroundService>();
+            builder.Services.AddHostedService<PublicAgentDraftCleanupService>();
+            builder.Services.AddHostedService<ProjectAttachmentDocumentExtractionService>();
             builder.Services.AddScoped<ISearchService, SearchService>();
             builder.Services.AddScoped<IPromotionService, PromotionService>();
             builder.Services.AddScoped<ISolarAnalyticsService, SolarAnalyticsService>();

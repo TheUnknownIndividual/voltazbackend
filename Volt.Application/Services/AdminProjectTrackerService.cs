@@ -111,10 +111,6 @@ namespace Volt.Application.Services
 
             var existingAttachments = await _uow.Repository<AdminTrackedProjectAttachment>()
                 .ListNoTrackingAsync(x => x.AdminTrackedProjectId == id, ct);
-            foreach (var attachment in existingAttachments)
-            {
-                _uow.Repository<AdminTrackedProjectAttachment>().Remove(attachment);
-            }
 
             var wasAccepted = IsAccepted(project.CurrentStatus);
             var willBeAccepted = IsAccepted(request.CurrentStatus);
@@ -128,7 +124,26 @@ namespace Volt.Application.Services
                 await _uow.Repository<AdminTrackedProjectOffer>().AddAsync(offer, ct);
             }
 
-            foreach (var attachment in BuildAttachments(request))
+            var requestedAttachments = BuildAttachments(request);
+            foreach (var existingAttachment in existingAttachments)
+            {
+                var matchIndex = requestedAttachments.FindIndex(x => string.Equals(x.FilePath, existingAttachment.FilePath, StringComparison.OrdinalIgnoreCase));
+                if (matchIndex < 0)
+                {
+                    _uow.Repository<AdminTrackedProjectAttachment>().Remove(existingAttachment);
+                    continue;
+                }
+
+                var replacement = requestedAttachments[matchIndex];
+                requestedAttachments.RemoveAt(matchIndex);
+                existingAttachment.FileName = replacement.FileName;
+                existingAttachment.Label = replacement.Label;
+                existingAttachment.Tag = replacement.Tag;
+                existingAttachment.IsActive = true;
+                _uow.Repository<AdminTrackedProjectAttachment>().Update(existingAttachment);
+            }
+
+            foreach (var attachment in requestedAttachments)
             {
                 attachment.AdminTrackedProjectId = id;
                 await _uow.Repository<AdminTrackedProjectAttachment>().AddAsync(attachment, ct);
@@ -413,6 +428,9 @@ namespace Volt.Application.Services
                 FileName = string.IsNullOrWhiteSpace(request.FileName) ? "Document.docx" : Normalize(request.FileName, 260),
                 FilePath = request.FilePath.Trim(),
                 Label = Normalize(request.Label, 120),
+                Tag = NormalizeAttachmentTag(request.Tag),
+                CreatedAt = DateTime.UtcNow,
+                DocumentExtractionStatus = IsDocx(request.FileName, request.FilePath) ? "Pending" : "NotRequired",
                 IsActive = true
             }, ct);
             project.UpdatedAt = DateTime.UtcNow;
@@ -496,7 +514,10 @@ namespace Volt.Application.Services
                     Id = x.Id,
                     FileName = x.FileName,
                     FilePath = x.FilePath,
-                    Label = x.Label
+                    Label = x.Label,
+                    Tag = x.Tag,
+                    CreatedAt = x.CreatedAt,
+                    DocumentExtractionStatus = x.DocumentExtractionStatus
                 }).ToList()
             };
         }
@@ -546,11 +567,14 @@ namespace Volt.Application.Services
                 .Where(x => !string.IsNullOrWhiteSpace(x.FilePath))
                 .Select(x => new AdminTrackedProjectAttachment
                 {
-                    FileName = string.IsNullOrWhiteSpace(x.FileName) ? "Document.pdf" : Normalize(x.FileName, 260),
-                    FilePath = x.FilePath.Trim(),
-                    Label = Normalize(x.Label, 120),
-                    IsActive = true
-                })
+                FileName = string.IsNullOrWhiteSpace(x.FileName) ? "Document.pdf" : Normalize(x.FileName, 260),
+                FilePath = x.FilePath.Trim(),
+                Label = Normalize(x.Label, 120),
+                Tag = NormalizeAttachmentTag(x.Tag),
+                CreatedAt = DateTime.UtcNow,
+                DocumentExtractionStatus = IsDocx(x.FileName, x.FilePath) ? "Pending" : "NotRequired",
+                IsActive = true
+            })
                 .ToList();
 
         private static string ValidateRequest(AdminTrackedProjectUpsertRequest request)
@@ -585,6 +609,15 @@ namespace Volt.Application.Services
                 ? normalized[..maxLength]
                 : normalized;
         }
+
+        private static string NormalizeAttachmentTag(string? value)
+            => string.Equals(value?.Trim(), "Banka müraciət sənədi", StringComparison.OrdinalIgnoreCase)
+                ? "Banka müraciət sənədi"
+                : "Qiymət təklifi";
+
+        private static bool IsDocx(string? fileName, string? filePath)
+            => (fileName ?? string.Empty).EndsWith(".docx", StringComparison.OrdinalIgnoreCase)
+                || (filePath ?? string.Empty).Split('?', '#')[0].EndsWith(".docx", StringComparison.OrdinalIgnoreCase);
 
         private static bool IsAccepted(string? status)
         {

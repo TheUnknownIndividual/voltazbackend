@@ -47,6 +47,9 @@ namespace Volt.Application.Dtos.AdminProjectTracker
         public string FileName { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
+        public string Tag { get; set; } = "Qiymət təklifi";
+        public DateTime CreatedAt { get; set; }
+        public string DocumentExtractionStatus { get; set; } = "NotRequired";
     }
 
     public sealed class AdminTrackedProjectUpsertRequest
@@ -84,5 +87,6 @@ namespace Volt.Application.Dtos.AdminProjectTracker
         public string FileName { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
         public string Label { get; set; } = string.Empty;
+        public string Tag { get; set; } = "Qiymət təklifi";
     }
 }

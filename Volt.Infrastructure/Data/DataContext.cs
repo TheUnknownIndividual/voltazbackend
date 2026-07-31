@@ -38,6 +38,7 @@ namespace Volt.Infrastructure.Data
         public DbSet<EmailAddress> EmailAddresses { get; set; }
         public DbSet<ServiceRequest> ServiceRequests { get; set; }
         public DbSet<ContactRequst> ContactRequsts { get; set; }
+        public DbSet<PublicAgentContactDraft> PublicAgentContactDrafts => Set<PublicAgentContactDraft>();
         public DbSet<Blog> Blogs { get; set; }
         public DbSet<BlogTranslation> BlogTranslations { get; set; }
         public DbSet<NewsPost> NewsPosts { get; set; }

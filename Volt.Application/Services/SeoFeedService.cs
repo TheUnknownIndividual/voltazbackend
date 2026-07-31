@@ -14,6 +14,7 @@ namespace Volt.Application.Services
             "/",
             "/about",
             "/services",
+            "/solar-installation",
             "/projects",
             "/products",
             "/calculator",
@@ -46,14 +47,24 @@ namespace Volt.Application.Services
         {
             XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
             XNamespace imageNs = "http://www.google.com/schemas/sitemap-image/1.1";
+            XNamespace xhtmlNs = "http://www.w3.org/1999/xhtml";
 
             var products = await _uow.Repository<Product>().ListNoTrackingAsync(x => x.IsActive, ct);
             var productIds = products.Select(x => x.Id).ToHashSet();
             var images = productIds.Count == 0
                 ? new List<ProductImage>()
                 : await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId) && x.Type, ct);
+            var productDescriptions = productIds.Count == 0
+                ? new List<ProductDescription>()
+                : await _uow.Repository<ProductDescription>().ListNoTrackingAsync(x => productIds.Contains(x.ProductId), ct);
+            var productDescriptionIds = productDescriptions.Select(x => x.Id).ToHashSet();
+            var productDescriptionLanguages = productDescriptionIds.Count == 0
+                ? new List<ProductDescriptionLanguage>()
+                : await _uow.Repository<ProductDescriptionLanguage>().ListNoTrackingAsync(x => productDescriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
 
-            var root = new XElement(ns + "urlset", new XAttribute(XNamespace.Xmlns + "image", imageNs));
+            var root = new XElement(ns + "urlset",
+                new XAttribute(XNamespace.Xmlns + "image", imageNs),
+                new XAttribute(XNamespace.Xmlns + "xhtml", xhtmlNs));
 
             foreach (var route in StaticRoutes)
             {
@@ -180,6 +191,70 @@ namespace Volt.Application.Services
                 root.Add(url);
             }
 
+            var defaultLanguageUrls = root.Elements(ns + "url").ToList();
+            root.RemoveNodes();
+            var allLanguages = new[] { "az", "en", "ru", "tr" };
+            var productLanguageMap = (from description in productDescriptions
+                                      join language in productDescriptionLanguages on description.Id equals language.ProductDescriptionId
+                                      group (int)language.LanguageCode by description.ProductId into grouped
+                                      select grouped).ToDictionary(grouped => grouped.Key, grouped => grouped.AsEnumerable());
+            var projectLanguageMap = projectLanguages.GroupBy(x => x.ProjectId).ToDictionary(grouped => grouped.Key, grouped => grouped.Select(x => (int)x.LanguageCode));
+            var blogLanguageMap = blogTranslations.GroupBy(x => x.BlogId).ToDictionary(grouped => grouped.Key, grouped => grouped.Select(x => (int)x.LanguageCode));
+            var newsLanguageMap = newsLanguages.GroupBy(x => x.NewsPostId).ToDictionary(grouped => grouped.Key, grouped => grouped.Select(x => (int)x.LanguageCode));
+
+            IReadOnlyCollection<string> AvailableLanguages(string basePath)
+            {
+                var parts = basePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2 || !int.TryParse(parts[1], out var entityId))
+                {
+                    return allLanguages;
+                }
+
+                IEnumerable<int> languageCodes = parts[0].ToLowerInvariant() switch
+                {
+                    "product" => productLanguageMap.GetValueOrDefault(entityId) ?? Enumerable.Empty<int>(),
+                    "projects" => projectLanguageMap.GetValueOrDefault(entityId) ?? Enumerable.Empty<int>(),
+                    "blog" => blogLanguageMap.GetValueOrDefault(entityId) ?? Enumerable.Empty<int>(),
+                    "news" => newsLanguageMap.GetValueOrDefault(entityId) ?? Enumerable.Empty<int>(),
+                    _ => Enumerable.Empty<int>()
+                };
+
+                return languageCodes
+                    .Select(code => code switch { 2 => "en", 3 => "ru", 4 => "tr", _ => "az" })
+                    .Append("az")
+                    .Distinct()
+                    .ToArray();
+            }
+
+            foreach (var sourceUrl in defaultLanguageUrls)
+            {
+                var absoluteLocation = sourceUrl.Element(ns + "loc")?.Value;
+                if (!Uri.TryCreate(absoluteLocation, UriKind.Absolute, out var uri))
+                {
+                    continue;
+                }
+
+                var basePath = uri.AbsolutePath;
+                var languages = AvailableLanguages(basePath);
+                foreach (var language in languages)
+                {
+                    var localizedUrl = new XElement(sourceUrl);
+                    localizedUrl.Element(ns + "loc")!.Value = BuildAbsoluteUrl(LocalizePath(basePath, language));
+                    var alternateElements = languages
+                        .Select(alternateLanguage => new XElement(xhtmlNs + "link",
+                            new XAttribute("rel", "alternate"),
+                            new XAttribute("hreflang", alternateLanguage),
+                            new XAttribute("href", BuildAbsoluteUrl(LocalizePath(basePath, alternateLanguage)))))
+                        .Append(new XElement(xhtmlNs + "link",
+                            new XAttribute("rel", "alternate"),
+                            new XAttribute("hreflang", "x-default"),
+                            new XAttribute("href", BuildAbsoluteUrl(LocalizePath(basePath, "az")))));
+
+                    localizedUrl.Element(ns + "loc")!.AddAfterSelf(alternateElements);
+                    root.Add(localizedUrl);
+                }
+            }
+
             return ToXmlString(new XDocument(new XDeclaration("1.0", "UTF-8", null), root));
         }
 
@@ -199,8 +274,6 @@ namespace Volt.Application.Services
                 "Disallow: /checkout",
                 "Disallow: /order",
                 "Disallow: /theme-lab",
-                "",
-                "Content-Signal: ai-train=no, search=yes, ai-input=no",
                 "",
                 $"Sitemap: {baseUrl}/sitemap.xml",
                 ""
@@ -225,6 +298,27 @@ namespace Volt.Application.Services
             }
 
             return $"{baseUrl}/{path.TrimStart('/')}";
+        }
+
+        private static string LocalizePath(string basePath, string language)
+        {
+            if (basePath.Equals("/solar-installation", StringComparison.OrdinalIgnoreCase))
+            {
+                return language switch
+                {
+                    "en" => "/en/solar-panel-installation",
+                    "ru" => "/ru/ustanovka-solnechnyh-paneley",
+                    "tr" => "/tr/gunes-paneli-kurulumu",
+                    _ => "/gunes-paneli-qurasdirilmasi"
+                };
+            }
+
+            if (language == "az")
+            {
+                return basePath;
+            }
+
+            return basePath == "/" ? $"/{language}" : $"/{language}{basePath}";
         }
 
         private string NormalizeUrl(string? url)
