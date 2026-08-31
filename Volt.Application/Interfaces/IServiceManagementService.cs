@@ -15,6 +15,9 @@ namespace Volt.Application.Interfaces
         Task<ApiResponse<ServiceManagementDto>> CreateAsync(ServiceManagementCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<IReadOnlyList<ServiceManagementDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<ServiceManagementDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default);
+        Task<ApiResponse<ServiceManagementDto>> GetBySlugAsync(string slug, LanguageCode? languageCode = null, CancellationToken ct = default);
+        Task<ApiResponse<IReadOnlyList<ServiceCategorySettingDto>>> GetCategorySettingsAsync(CancellationToken ct = default);
+        Task<ApiResponse<ServiceCategorySettingDto>> UpdateCategorySettingAsync(ServiceCategory category, ServiceCategorySettingUpdateRequest request, CancellationToken ct = default);
         Task<ApiResponse<ServiceManagementDto>> UpdateAsync(int id, ServiceManagementUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default);
     }

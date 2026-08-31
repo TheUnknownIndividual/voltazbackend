@@ -76,7 +76,7 @@ namespace Volt.Application.Services
             {
                 return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
             }
-            if (admin.IsSuperAdmin)
+            if (admin.IsEffectiveSuperAdmin)
                 return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Primary admin password cannot be changed here.");
 
             _passwordHelper.CreatePasswordHash(request.NewPassword, out byte[] passwordHash, out byte[] passwordSalt);
@@ -100,7 +100,7 @@ namespace Volt.Application.Services
             {
                 return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
             }
-            if (admin.IsSuperAdmin)
+            if (admin.IsEffectiveSuperAdmin)
                 return ApiResponse<NoContentDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "A full admin cannot be deleted.");
 
             // Admin users can be referenced by audits, tasks and execution records.
@@ -156,7 +156,7 @@ namespace Volt.Application.Services
         {
             var admin = await _uow.Repository<AdminUser>().FirstOrDefaultAsync(x => x.Id == id, ct);
             if (admin is null) return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.ADMIN_NOT_FOUND, "Admin not found");
-            if (admin.IsSuperAdmin) return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Primary admin access cannot be restricted.");
+            if (admin.IsEffectiveSuperAdmin) return ApiResponse<AdminDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Primary admin access cannot be restricted.");
             admin.DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? admin.Username : request.DisplayName.Trim();
             admin.IsActive = request.IsActive;
             admin.CanDeleteProjects = request.CanDeleteProjects;
@@ -190,10 +190,14 @@ namespace Volt.Application.Services
             return ApiResponse<AdminUserActivityPageDto>.SuccessResponse(new AdminUserActivityPageDto(items, total, page, pageSize));
         }
 
-        private static AdminDto ToDto(AdminUser admin, IEnumerable<AdminPage> pages) => new(
-            admin.Id, admin.Username, string.IsNullOrWhiteSpace(admin.DisplayName) ? admin.Username : admin.DisplayName,
-            admin.Role, admin.IsActive, admin.IsSuperAdmin, admin.IsSuperAdmin || admin.CanDeleteProjects, admin.IsSuperAdmin || admin.CanEditProjects,
-            admin.IsSuperAdmin || admin.CanApproveWarehouseMovements, admin.IsStakeholder, admin.MonthlySalary.HasValue, admin.TelegramChatId,
-            admin.IsSuperAdmin ? Enum.GetValues<Volt.Domain.Enums.AdminPage>().ToList() : pages.Distinct().OrderBy(x => x).ToList());
+        private static AdminDto ToDto(AdminUser admin, IEnumerable<AdminPage> pages)
+        {
+            var isSuperAdmin = admin.IsEffectiveSuperAdmin;
+            return new(
+                admin.Id, admin.Username, string.IsNullOrWhiteSpace(admin.DisplayName) ? admin.Username : admin.DisplayName,
+                admin.Role, admin.IsActive, isSuperAdmin, isSuperAdmin || admin.CanDeleteProjects, isSuperAdmin || admin.CanEditProjects,
+                isSuperAdmin || admin.CanApproveWarehouseMovements, admin.IsStakeholder, admin.MonthlySalary.HasValue, admin.TelegramChatId,
+                isSuperAdmin ? Enum.GetValues<Volt.Domain.Enums.AdminPage>().ToList() : pages.Distinct().OrderBy(x => x).ToList());
+        }
     }
 }

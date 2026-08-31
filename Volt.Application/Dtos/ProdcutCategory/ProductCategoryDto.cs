@@ -8,6 +8,10 @@ namespace Volt.Application.Dtos.ProdcutCategory
 {
     public sealed record ProductCategoryDto(
         int Id,
-        IReadOnlyList<ProductCategoryLanguageDto> Languages
+        string SeoKey,
+        IReadOnlyList<ProductCategoryLanguageDto> Languages,
+        bool ShowOnHomePage,
+        int HomePageDisplayOrder,
+        int? HomePageProductId
         );
 }

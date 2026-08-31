@@ -24,5 +24,12 @@ namespace Volt.Application.Dtos.ServiceManagement
         public string Content2 { get; set; }
         public string Content3 { get; set; }
         public string Content4 { get; set; }
+        public string DetailContentHtml { get; set; }
+        [MaxLength(200)]
+        public string SeoTitle { get; set; }
+        [MaxLength(500)]
+        public string SeoDescription { get; set; }
+        [MaxLength(500)]
+        public string SeoKeywords { get; set; }
     }
 }

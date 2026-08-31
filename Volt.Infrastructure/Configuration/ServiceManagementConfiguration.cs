@@ -22,6 +22,26 @@ namespace Volt.Infrastructure.Configuration
                 .IsRequired()
                 .HasDefaultValue(true);
 
+            builder.Property(x => x.Category)
+                .IsRequired()
+                .HasDefaultValue(Volt.Domain.Enums.ServiceCategory.Population);
+
+            builder.Property(x => x.ReadMoreUrl)
+                .HasMaxLength(500)
+                .IsRequired(false);
+
+            builder.Property(x => x.DetailPageSlug)
+                .HasMaxLength(160)
+                .IsRequired(false);
+
+            builder.Property(x => x.BannerImageUrl)
+                .HasMaxLength(1000)
+                .IsRequired(false);
+
+            builder.HasIndex(x => x.DetailPageSlug)
+                .IsUnique()
+                .HasFilter("[DetailPageSlug] IS NOT NULL");
+
             builder.Property(x => x.CreatedAt)
                 .IsRequired();
 

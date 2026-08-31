@@ -37,7 +37,7 @@ namespace Volt.API.Controllers
                     Volt.Domain.Enums.Role.Admin,
                     token.Data.UserId,
                     ct);
-                _authCookieService.SetRefreshCookie(Response, refreshToken);
+                _authCookieService.SetRefreshCookie(Response, refreshToken, Volt.Domain.Enums.Role.Admin);
             }
 
             return CreateActionResult(token);

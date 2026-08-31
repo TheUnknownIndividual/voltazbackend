@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Volt.API.Infrastructure.Localization;
 using Volt.Application.Dtos.ServiceManagement;
 using Volt.Application.Interfaces;
+using Volt.Domain.Enums;
 
 namespace Volt.API.Controllers
 {
@@ -24,9 +25,30 @@ namespace Volt.API.Controllers
         public async Task<IActionResult> GetAll(CancellationToken ct)
             => CreateActionResult(await _service.GetAllAsync(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
+        [Authorize]
+        [HttpGet("admin")]
+        public async Task<IActionResult> GetAllForAdmin(CancellationToken ct)
+            => CreateActionResult(await _service.GetAllAsync(null, ct));
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id, CancellationToken ct)
             => CreateActionResult(await _service.GetByIdAsync(id, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+
+        [HttpGet("page/{slug}")]
+        public async Task<IActionResult> GetBySlug(string slug, CancellationToken ct)
+            => CreateActionResult(await _service.GetBySlugAsync(slug, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+
+        [HttpGet("category-settings")]
+        public async Task<IActionResult> GetCategorySettings(CancellationToken ct)
+            => CreateActionResult(await _service.GetCategorySettingsAsync(ct));
+
+        [Authorize]
+        [HttpPut("category-settings/{category:int}")]
+        public async Task<IActionResult> UpdateCategorySetting(
+            ServiceCategory category,
+            [FromBody] ServiceCategorySettingUpdateRequest request,
+            CancellationToken ct)
+            => CreateActionResult(await _service.UpdateCategorySettingAsync(category, request, ct));
 
         [Authorize]
         [HttpPost]

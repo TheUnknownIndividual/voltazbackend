@@ -17,16 +17,21 @@ namespace Volt.Infrastructure.Data
         public DbSet<AdminTelegramConnectionToken> AdminTelegramConnectionTokens => Set<AdminTelegramConnectionToken>();
         public DbSet<AdminPagePermission> AdminPagePermissions => Set<AdminPagePermission>();
         public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
+        public DbSet<MetaInboxConversation> MetaInboxConversations => Set<MetaInboxConversation>();
+        public DbSet<MetaInboxMessage> MetaInboxMessages => Set<MetaInboxMessage>();
+        public DbSet<MetaInboxInternalNote> MetaInboxInternalNotes => Set<MetaInboxInternalNote>();
         public DbSet<CustomerUser> CustomerUsers => Set<CustomerUser>();
         public DbSet<CustomerExternalLogin> CustomerExternalLogins => Set<CustomerExternalLogin>();
         public DbSet<CustomerPasskeyCredential> CustomerPasskeyCredentials => Set<CustomerPasskeyCredential>();
         public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
+        public DbSet<HomeSliderSettings> HomeSliderSettings => Set<HomeSliderSettings>();
         public DbSet<About> Abouts { get; set; }
         public DbSet<AboutLanguage> AboutLanguages { get; set; }
         public DbSet<Step> Steps { get; set; }
         public DbSet<StepLanguage> StepLanguages { get; set; }
         public DbSet<ServiceManagement> ServiceManagements { get; set; }
         public DbSet<ServiceManagementLanguage> ServiceManagementLanguages { get; set; }
+        public DbSet<ServiceCategorySetting> ServiceCategorySettings { get; set; }
         public DbSet<ApplicationType> ApplicationTypes { get; set; }
         public DbSet<ApplicationTypeLanguage> ApplicationTypeLanguages { get; set; }
         public DbSet<PartnershipType> PartnershipTypes { get; set; }
@@ -71,9 +76,11 @@ namespace Volt.Infrastructure.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<ProductImage> ProductImages { get; set; }
         public DbSet<ProductParametr> ProductParametrs { get; set; }
+        public DbSet<ProductParametrLanguage> ProductParametrLanguages { get; set; }
         public DbSet<ProductDescription> ProductDescriptions { get; set; }
         public DbSet<ProductDescriptionLanguage> ProductDescriptionLanguages { get; set; }
         public DbSet<ProductPromotion> ProductPromotions { get; set; }
+        public DbSet<ProductAiImportJob> ProductAiImportJobs { get; set; }
         public DbSet<SolarInverterSpecification> SolarInverterSpecifications { get; set; }
         public DbSet<SolarInverterDatasheetDocument> SolarInverterDatasheetDocuments { get; set; }
         public DbSet<SolarSalesProject> SolarSalesProjects { get; set; }

@@ -46,5 +46,10 @@ namespace Volt.API.Controllers
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id, CancellationToken ct)
             => CreateActionResult(await _service.DeleteAsync(id, ct));
+
+        [Authorize]
+        [HttpPatch("{id:int}/viewed")]
+        public async Task<IActionResult> MarkViewed(int id, CancellationToken ct)
+            => CreateActionResult(await _service.MarkViewedAsync(id, ct));
     }
 }

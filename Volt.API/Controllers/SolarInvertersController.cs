@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
+using Volt.Application.Configuration;
 using Volt.Application.Dtos.SolarInverter;
 using Volt.Application.Interfaces;
 
@@ -13,13 +15,16 @@ public sealed class SolarInvertersController : CustomBaseController
 {
     private readonly ISolarInverterService _service;
     private readonly ISolarInverterDatasheetQaService _qaService;
+    private readonly SolarInverterQaOptions _qaOptions;
 
     public SolarInvertersController(
         ISolarInverterService service,
-        ISolarInverterDatasheetQaService qaService)
+        ISolarInverterDatasheetQaService qaService,
+        IOptions<SolarInverterQaOptions> qaOptions)
     {
         _service = service;
         _qaService = qaService;
+        _qaOptions = qaOptions.Value;
     }
 
     [HttpGet]
@@ -44,19 +49,27 @@ public sealed class SolarInvertersController : CustomBaseController
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         CancellationToken ct = default)
-        => CreateActionResult(await _qaService.GetListAsync(
+    {
+        if (!_qaOptions.Enabled) return NotFound();
+
+        return CreateActionResult(await _qaService.GetListAsync(
             status,
             search,
             page,
             pageSize,
             ct));
+    }
 
     [HttpGet("datasheets/qa/{specificationId:int}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetDatasheetQaDetail(
         int specificationId,
         CancellationToken ct)
-        => CreateActionResult(await _qaService.GetDetailAsync(specificationId, ct));
+    {
+        if (!_qaOptions.Enabled) return NotFound();
+
+        return CreateActionResult(await _qaService.GetDetailAsync(specificationId, ct));
+    }
 
     [HttpPut("datasheets/qa/{specificationId:int}")]
     [Authorize(Roles = "Admin")]
@@ -64,21 +77,29 @@ public sealed class SolarInvertersController : CustomBaseController
         int specificationId,
         [FromBody] SolarInverterQaUpdateRequest request,
         CancellationToken ct)
-        => CreateActionResult(await _qaService.UpdateAsync(
+    {
+        if (!_qaOptions.Enabled) return NotFound();
+
+        return CreateActionResult(await _qaService.UpdateAsync(
             specificationId,
             GetAdminUserId(),
             request,
             ct));
+    }
 
     [HttpPost("datasheets/qa/{specificationId:int}/done")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CompleteDatasheetQa(
         int specificationId,
         CancellationToken ct)
-        => CreateActionResult(await _qaService.DoneAsync(
+    {
+        if (!_qaOptions.Enabled) return NotFound();
+
+        return CreateActionResult(await _qaService.DoneAsync(
             specificationId,
             GetAdminUserId(),
             ct));
+    }
 
     private int GetAdminUserId()
         => int.TryParse(

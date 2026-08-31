@@ -1,0 +1,15 @@
+{
+  "ProductAiImport": {
+    "Enabled": false,
+    "ApiKey": "",
+    "Model": "gpt-5.6",
+    "TrustedAssetBaseUrl": "https://cloudfiles.volt.az/",
+    "MaxFiles": 10,
+    "MaxCombinedBytes": 52428800,
+    "DraftLifetimeHours": 168,
+    "RequestTimeoutSeconds": 180,
+    "MaxConcurrentJobs": 2,
+    "ReasoningEffort": "low",
+    "MaxOutputTokens": 16000
+  }
+}

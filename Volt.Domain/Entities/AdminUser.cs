@@ -30,7 +30,21 @@ namespace Volt.Domain.Entities
         public DateTime? SalaryPaymentDate { get; set; }
         /// <summary>Private Telegram chat ID collected after the staff member starts the internal bot.</summary>
         public long? TelegramChatId { get; set; }
+        /// <summary>Receives WhatsApp out-of-stock ("Yoxla") interaction alerts.</summary>
+        public bool ReceivesYoxlaNotifications { get; set; }
+        /// <summary>Receives solar calculator quote-request interaction alerts.</summary>
+        public bool ReceivesQiymetlendirmeNotifications { get; set; }
         public ICollection<AdminPagePermission> PagePermissions { get; set; } = new List<AdminPagePermission>();
         public ICollection<AdminAuditLog> AuditLogs { get; set; } = new List<AdminAuditLog>();
+
+        /// <summary>
+        /// The "admin" account is the primary/root operator account and must always keep
+        /// full access, independent of its IsSuperAdmin DB flag - so it can never be
+        /// accidentally restricted, demoted, password-reset, or deleted by another admin.
+        /// </summary>
+        public static bool IsPrimaryUsername(string username)
+            => string.Equals(username, "admin", StringComparison.OrdinalIgnoreCase);
+
+        public bool IsEffectiveSuperAdmin => IsSuperAdmin || IsPrimaryUsername(Username);
     }
 }

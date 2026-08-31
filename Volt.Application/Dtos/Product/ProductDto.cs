@@ -10,6 +10,7 @@ namespace Volt.Application.Dtos.Product
         bool InStock,
         DateTime? OutOfStockAt,
         bool InHomePage,
+        bool UseCommonVariantContent,
         string Certificate,
         IReadOnlyList<string> ProductImage,
         IReadOnlyList<string> ProductDatasheet,

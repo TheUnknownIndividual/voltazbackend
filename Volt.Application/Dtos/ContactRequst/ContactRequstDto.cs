@@ -10,6 +10,8 @@ namespace Volt.Application.Dtos.ContactRequst
         DateTime CreatedAt,
         byte Status,
         bool IsActive,
-        int ApplicationTypeId
+        int ApplicationTypeId,
+        bool IsViewedByAdmin,
+        DateTime? AdminViewedAt
     );
 }

@@ -10,6 +10,7 @@ SOLUTION_PATH="$ROOT_DIR/Volt.sln"
 DEFAULT_PUBLISH_DIR="$ROOT_DIR/publish/api"
 PUBLISH_DIR="${PUBLISH_DIR:-$DEFAULT_PUBLISH_DIR}"
 REMOTE_DIR="${REMOTE_DIR:-/apivoltaz}"
+DATABASE_NAME="${DATABASE_NAME:-}"
 
 : "${FTP_USER:?Set FTP_USER before running this script.}"
 : "${FTP_PASS:?Set FTP_PASS before running this script.}"
@@ -44,6 +45,11 @@ if [ -n "${ASPNETCORE_ENVIRONMENT:-}" ] && [[ ! "$ASPNETCORE_ENVIRONMENT" =~ ^(D
   exit 1
 fi
 
+if [ -n "$DATABASE_NAME" ] && [[ ! "$DATABASE_NAME" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "Invalid DATABASE_NAME." >&2
+  exit 1
+fi
+
 command -v dotnet >/dev/null || {
   echo "dotnet is required but was not found in PATH." >&2
   exit 1
@@ -73,15 +79,60 @@ echo "Restoring packages..."
 dotnet restore "$SOLUTION_PATH"
 
 echo "Building $SOLUTION_PATH ($CONFIGURATION)..."
-dotnet build "$SOLUTION_PATH" --configuration "$CONFIGURATION" --no-restore
+dotnet build "$SOLUTION_PATH" \
+  --configuration "$CONFIGURATION" \
+  --no-restore \
+  --disable-build-servers
 
 echo "Publishing $PROJECT_PATH to $PUBLISH_DIR..."
 rm -rf "$PUBLISH_DIR"
 dotnet publish "$PROJECT_PATH" \
   --configuration "$CONFIGURATION" \
   --no-restore \
+  --disable-build-servers \
   --output "$PUBLISH_DIR" \
   /p:UseAppHost=false
+
+if [ -n "$DATABASE_NAME" ]; then
+  if [ -z "${ASPNETCORE_ENVIRONMENT:-}" ]; then
+    echo "DATABASE_NAME requires ASPNETCORE_ENVIRONMENT so the override stays environment-specific." >&2
+    exit 1
+  fi
+
+  BASE_SETTINGS_FILE="$PUBLISH_DIR/appsettings.json"
+  ENVIRONMENT_SETTINGS_FILE="$PUBLISH_DIR/appsettings.$ASPNETCORE_ENVIRONMENT.json"
+
+  if [ ! -f "$BASE_SETTINGS_FILE" ] || [ ! -f "$ENVIRONMENT_SETTINGS_FILE" ]; then
+    echo "Required appsettings files are missing from the publish output." >&2
+    exit 1
+  fi
+
+  export DATABASE_NAME BASE_SETTINGS_FILE
+  perl -0pi -e '
+    open my $source, "<", $ENV{BASE_SETTINGS_FILE}
+      or die "Could not read base appsettings.json\n";
+    local $/;
+    my $base = <$source>;
+    close $source;
+
+    $base =~ /^\s*"DefaultConnection"\s*:\s*"([^"]+)"/m
+      or die "Could not find the active base DefaultConnection\n";
+    my $connection = $1;
+    $connection =~ s/(Database=)[^;]+/$1$ENV{DATABASE_NAME}/i
+      or die "Could not set the database name\n";
+
+    s{^(\s*"DefaultConnection"\s*:\s*")[^"]*(")}
+      {$1 . $connection . $2}em
+      or die "Could not replace the environment DefaultConnection\n";
+  ' "$ENVIRONMENT_SETTINGS_FILE"
+
+  grep -q "Database=$DATABASE_NAME;" "$ENVIRONMENT_SETTINGS_FILE" || {
+    echo "Environment database override validation failed." >&2
+    exit 1
+  }
+
+  echo "Prepared $ASPNETCORE_ENVIRONMENT database configuration for $DATABASE_NAME."
+fi
 
 if [ -n "${ASPNETCORE_ENVIRONMENT:-}" ]; then
   export ASPNETCORE_ENVIRONMENT
@@ -142,4 +193,4 @@ rm "$REMOTE_DIR/app_offline.htm"
 bye
 LFTP_COMMANDS
 
-echo "Done."
+echo "Done. The API will apply pending EF Core migrations during startup."

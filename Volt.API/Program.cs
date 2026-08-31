@@ -35,6 +35,9 @@ namespace Volt.API
             // which contains the bot token. Keep this client at warning level; our own
             // warning logs record only safe delivery diagnostics.
             builder.Logging.AddFilter("System.Net.Http.HttpClient.ITelegramTaskNotificationService", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.IMetaInboxService", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.IMetaWhatsAppOnboardingService", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.ProductAiImportProcessor", LogLevel.Warning);
 
             // This optional file is provisioned only on the production server
             // by the FTP deploy script. It keeps Telegram integration secrets
@@ -42,6 +45,8 @@ namespace Volt.API
             // are added afterwards so an IIS/server setting always takes priority.
             builder.Configuration
                 .AddJsonFile("telegram.production.json", optional: true, reloadOnChange: false)
+                .AddJsonFile("meta-inbox.production.json", optional: true, reloadOnChange: false)
+                .AddJsonFile("openai.production.json", optional: true, reloadOnChange: false)
                 .AddEnvironmentVariables();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -78,6 +83,16 @@ namespace Volt.API
                     {
                         AutoReplenishment = true,
                         PermitLimit = 500,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("public-analytics", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"public-analytics:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 60,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0
                     }));
@@ -132,6 +147,36 @@ namespace Volt.API
                         QueueLimit = 0
                     }));
 
+                options.AddPolicy("product-ai-import", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"product-ai-import:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromHours(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("datasheet-preview", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"datasheet-preview:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 120,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("meta-webhook", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"meta-webhook:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 3000,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
                 options.OnRejected = async (context, cancellationToken) =>
                 {
                     context.HttpContext.Response.ContentType = "application/json";
@@ -176,6 +221,7 @@ namespace Volt.API
             builder.Services.AddScoped<IAboutService, AboutService>();
             builder.Services.AddScoped<IUploadService, UploadService>();
             builder.Services.AddScoped<IFileService, FileService>();
+            builder.Services.AddScoped<IHomeSliderService, HomeSliderService>();
             builder.Services.AddScoped<IStepService, StepService>();
             builder.Services.AddScoped<IServiceManagementService, ServiceManagementService>();
             builder.Services.AddScoped<IApplicationTypeService, ApplicationTypeService>();
@@ -202,6 +248,19 @@ namespace Volt.API
                 client.Timeout = TimeSpan.FromSeconds(5);
             });
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
+            builder.Services.Configure<MetaInboxOptions>(builder.Configuration.GetSection("MetaInbox"));
+            builder.Services.AddSingleton<MetaWebhookDiagnostics>();
+            builder.Services.AddSingleton<MetaWhatsAppOnboardingSessionStore>();
+            builder.Services.AddHttpClient<IMetaInboxService, MetaInboxService>(client =>
+            {
+                client.BaseAddress = new Uri("https://graph.facebook.com/");
+                client.Timeout = TimeSpan.FromSeconds(8);
+            });
+            builder.Services.AddHttpClient<IMetaWhatsAppOnboardingService, MetaWhatsAppOnboardingService>(client =>
+            {
+                client.BaseAddress = new Uri("https://graph.facebook.com/");
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
             builder.Services.Configure<SeoOptions>(builder.Configuration.GetSection("Seo"));
             builder.Services.AddHttpClient("seo");
             builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
@@ -210,6 +269,20 @@ namespace Volt.API
             builder.Services.AddScoped<IProductTechnologyService, ProductTechnologyService>();
             builder.Services.AddScoped<IProductSearchService, ProductSearchService>();
             builder.Services.AddScoped<IProductService, ProductService>();
+            builder.Services.Configure<ProductAiImportOptions>(builder.Configuration.GetSection("ProductAiImport"));
+            builder.Services.AddScoped<ProductDatasheetUploadService>();
+            builder.Services.AddHttpClient("product-datasheet-preview", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+            }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+            builder.Services.AddSingleton<ProductAiImportQueue>();
+            builder.Services.AddScoped<ProductAiImportCoordinator>();
+            builder.Services.AddHttpClient<ProductAiImportProcessor>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.openai.com/v1/");
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            });
+            builder.Services.AddHostedService<ProductAiImportBackgroundService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();
@@ -218,12 +291,16 @@ namespace Volt.API
             builder.Services.AddHostedService<ProjectAttachmentDocumentExtractionService>();
             builder.Services.AddScoped<ISearchService, SearchService>();
             builder.Services.AddScoped<IPromotionService, PromotionService>();
+            builder.Services.AddSingleton<IWhatsappInteractionNotificationQueue, WhatsappInteractionNotificationQueue>();
+            builder.Services.AddHostedService<WhatsappInteractionTelegramBackgroundService>();
             builder.Services.AddScoped<ISolarAnalyticsService, SolarAnalyticsService>();
             builder.Services.Configure<SolarInverterOcrOptions>(
                 builder.Configuration.GetSection("SolarInverterOcr"));
             builder.Services.AddSingleton<ISolarInverterDatasheetParser, SolarInverterDatasheetParser>();
             builder.Services.Configure<SolarInverterPromotionOptions>(
                 builder.Configuration.GetSection("SolarInverterPromotion"));
+            builder.Services.Configure<SolarInverterQaOptions>(
+                builder.Configuration.GetSection("SolarInverterQa"));
             builder.Services.AddScoped<
                 ISolarInverterProductionPromotionService,
                 SolarInverterProductionPromotionService>();
@@ -325,10 +402,10 @@ namespace Volt.API
                 return;
             }
 
-            using (var scope = app.Services.CreateScope())
+            await using (var scope = app.Services.CreateAsyncScope())
             {
                 var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
-                dbContext.Database.Migrate();
+                await dbContext.Database.MigrateAsync();
             }
 
             // Configure the HTTP request pipeline.
@@ -344,8 +421,8 @@ namespace Volt.API
             
             app.UseCors("frontend");
 
-            app.UseRateLimiter();
             app.UseAuthentication();
+            app.UseRateLimiter();
             app.UseMiddleware<AdminPageAuthorizationMiddleware>();
             app.UseAuthorization();
             app.UseMiddleware<AdminWriteAuditMiddleware>();

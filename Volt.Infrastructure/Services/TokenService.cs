@@ -36,7 +36,7 @@ namespace Volt.Infrastructure.Services
                 issuer: _config["TokenOptions:Issuer"],
                 audience: _config["TokenOptions:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(GetAccessTokenLifetimeMinutes()),
+                expires: DateTime.UtcNow.AddMinutes(GetAdminAccessTokenLifetimeMinutes()),
                 signingCredentials: creds
             );
             var tokenstring = new JwtSecurityTokenHandler().WriteToken(token);
@@ -74,5 +74,12 @@ namespace Volt.Infrastructure.Services
             => int.TryParse(_config["TokenOptions:AccessTokenMinutes"], out var minutes)
                 ? Math.Max(5, minutes)
                 : 60;
+
+        // Admins reported being logged out every couple of hours; give the back-office
+        // its own, longer-lived access token instead of sharing the customer-facing value.
+        private int GetAdminAccessTokenLifetimeMinutes()
+            => int.TryParse(_config["TokenOptions:AdminAccessTokenMinutes"], out var minutes)
+                ? Math.Max(5, minutes)
+                : GetAccessTokenLifetimeMinutes();
     }
 }

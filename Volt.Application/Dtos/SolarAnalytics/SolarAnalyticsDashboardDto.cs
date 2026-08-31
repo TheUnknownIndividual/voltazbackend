@@ -6,6 +6,7 @@ namespace Volt.Application.Dtos.SolarAnalytics
         IReadOnlyList<SolarAnalyticsBreakdownDto> DocumentsByCode,
         IReadOnlyList<SolarAnalyticsBreakdownDto> SourceBreakdown,
         IReadOnlyList<SolarAnalyticsProjectDto> TopProjects,
+        IReadOnlyList<WhatsappProductDemandDto> OutOfStockDemand,
         IReadOnlyList<SolarAnalyticsRecentActivityDto> RecentActivity);
 
     public sealed record SolarAnalyticsSummaryDto(
@@ -32,6 +33,18 @@ namespace Volt.Application.Dtos.SolarAnalytics
         int CalculationCount,
         int DocumentCount,
         DateTime LastActivityAt);
+
+    public sealed record WhatsappProductDemandDto(
+        string ProductId,
+        string ProductName,
+        string Category,
+        string SubCategory,
+        string Brand,
+        string Variant,
+        int Initiations,
+        int RequestedUnits,
+        int UniqueDevices,
+        DateTime LastInteractionAt);
 
     public sealed record SolarAnalyticsRecentActivityDto(
         string Kind,

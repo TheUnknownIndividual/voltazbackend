@@ -267,6 +267,12 @@ namespace Volt.Application.Services
             IEnumerable<ProductParametr> parametrs)
         {
             var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var modelLabel in parametrs
+                         .Select(x => x.ModelLabel?.Trim())
+                         .Where(x => !string.IsNullOrWhiteSpace(x)))
+            {
+                values.Add(modelLabel!);
+            }
             foreach (var rawValue in parametrs
                          .Select(x => x.TechnicalPower?.Trim())
                          .Where(x => !string.IsNullOrWhiteSpace(x)))

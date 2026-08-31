@@ -17,6 +17,8 @@ namespace Volt.Domain.Enums
         Verification = 13,
         ExecutionProjects = 14,
         Accounting = 15,
-        SolarInverterQa = 16
+        SolarInverterQa = 16,
+        MessageInbox = 17,
+        WhatsAppOnboarding = 18
     }
 }

@@ -252,10 +252,18 @@ namespace Volt.Application.Services
                 product.InStock,
                 product.OutOfStockAt,
                 product.InHomePage,
+                product.UseCommonVariantContent,
                 product.Certificate,
                 images.Where(x => x.Type).Select(x => x.ImageUrl).ToList(),
                 images.Where(x => !x.Type).Select(x => x.ImageUrl).ToList(),
-                parametrs.Select(x => new ProductParametrDto(x.TechnicalPower, x.Effectiveness, x.Count, x.Amount)).ToList(),
+                parametrs.Select(x => new ProductParametrDto(
+                    x.Id,
+                    x.ModelLabel,
+                    x.TechnicalPower,
+                    x.Effectiveness,
+                    x.Count,
+                    x.Amount,
+                    Array.Empty<ProductParametrLanguageDto>())).ToList(),
                 descriptionList,
                 promotionIds);
         }

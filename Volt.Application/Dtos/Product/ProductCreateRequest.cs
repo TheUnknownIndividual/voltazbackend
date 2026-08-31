@@ -23,6 +23,8 @@ namespace Volt.Application.Dtos.Product
 
         public bool InHomePage { get; set; }
 
+        public bool UseCommonVariantContent { get; set; } = true;
+
         [MaxLength(1000)]
         public string Certificate { get; set; }
 

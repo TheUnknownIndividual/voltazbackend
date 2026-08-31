@@ -406,7 +406,7 @@ namespace Volt.Application.Services
             }
         }
 
-        private async Task<bool> IsSuperAdminAsync(int adminUserId, CancellationToken ct) => (await _uow.Repository<AdminUser>().FirstOrDefaultNoTrackingAsync(x => x.Id == adminUserId && x.IsActive, ct))?.IsSuperAdmin == true;
+        private async Task<bool> IsSuperAdminAsync(int adminUserId, CancellationToken ct) => (await _uow.Repository<AdminUser>().FirstOrDefaultNoTrackingAsync(x => x.Id == adminUserId && x.IsActive, ct))?.IsEffectiveSuperAdmin == true;
 
         public async Task<ApiResponse<AdminTrackedProjectDto>> AddAttachmentAsync(int id, AdminTrackedProjectAttachmentRequest request, CancellationToken ct = default)
         {

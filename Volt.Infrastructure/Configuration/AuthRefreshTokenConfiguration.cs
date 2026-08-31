@@ -23,6 +23,7 @@ namespace Volt.Infrastructure.Configuration
 
             builder.Property(x => x.CreatedAt).IsRequired();
             builder.Property(x => x.ExpiresAt).IsRequired();
+            builder.Property(x => x.SessionStartedAt).IsRequired();
             builder.Property(x => x.ConcurrencyToken).IsRowVersion();
 
             builder.HasIndex(x => x.TokenHash).IsUnique();

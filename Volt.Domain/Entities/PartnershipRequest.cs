@@ -14,5 +14,7 @@
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
         public bool IsActive { get; set; }
+        public bool IsViewedByAdmin { get; set; }
+        public DateTime? AdminViewedAt { get; set; }
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Net;
 using System.Security.Claims;
 using Volt.Application.Dtos.SolarAnalytics;
 using Volt.Application.Interfaces;
@@ -39,11 +40,17 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.LogPublicCalculationAsync(request, ct));
 
         [HttpPost("public/whatsapp-click")]
-        [EnableRateLimiting("public-write")]
+        [EnableRateLimiting("public-analytics")]
+        [RequestSizeLimit(65_536)]
         public async Task<IActionResult> LogPublicWhatsappClick([FromBody] PublicSolarTrackingRequest request, CancellationToken ct)
-            => CreateActionResult(await _service.LogPublicWhatsappClickAsync(request, ct));
+        {
+            request.ClientIpAddress = GetClientAddress(HttpContext);
+            request.RequestUserAgent = Request.Headers.UserAgent.ToString();
+            request.RequestReferrer = Request.Headers.Referer.ToString();
+            return CreateActionResult(await _service.LogPublicWhatsappClickAsync(request, ct));
+        }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpGet("dashboard")]
         public async Task<IActionResult> GetDashboard([FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken ct)
             => CreateActionResult(await _service.GetDashboardAsync(from, to, ct));
@@ -52,6 +59,23 @@ namespace Volt.API.Controllers
         {
             var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return int.TryParse(id, out var adminUserId) ? adminUserId : null;
+        }
+
+        private static string GetClientAddress(HttpContext context)
+        {
+            foreach (var headerName in new[] { "CF-Connecting-IP", "X-Forwarded-For", "X-Real-IP" })
+            {
+                var rawValue = context.Request.Headers[headerName].FirstOrDefault();
+                var candidate = rawValue?
+                    .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                    .FirstOrDefault();
+                if (IPAddress.TryParse(candidate, out var address))
+                {
+                    return address.ToString();
+                }
+            }
+
+            return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
         }
     }
 }

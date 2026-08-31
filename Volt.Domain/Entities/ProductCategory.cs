@@ -10,6 +10,11 @@ namespace Volt.Domain.Entities
     {
         public int Id { get; set; }
         public bool IsActive { get; set; }
+        public string SeoKey { get; set; }
+        public bool ShowOnHomePage { get; set; }
+        public int HomePageDisplayOrder { get; set; }
+        public int? HomePageProductId { get; set; }
+        public Product HomePageProduct { get; set; }
 
         public ICollection<ProductCategoryLanguage> Languages { get; set; } = new List<ProductCategoryLanguage>();
         public ICollection<ProductBrand> Brands { get; set; } = new List<ProductBrand>();

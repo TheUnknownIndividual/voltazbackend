@@ -12,6 +12,10 @@ namespace Volt.Infrastructure.Configuration
 
             builder.HasKey(x => x.Id);
 
+            builder.Property(x => x.ModelLabel)
+                .HasMaxLength(200)
+                .IsRequired(false);
+
             builder.Property(x => x.Effectiveness)
                 .HasColumnType("decimal(18,2)")
                 .IsRequired(false);

@@ -8,6 +8,8 @@ namespace Volt.Application.Dtos.Blog
         [MaxLength(500)]
         public string CoverImagePath { get; set; }
 
+        public bool IsActive { get; set; } = true;
+
         [Required]
         [MinLength(1)]
         public List<BlogTranslationCreateRequest> Translations { get; set; }

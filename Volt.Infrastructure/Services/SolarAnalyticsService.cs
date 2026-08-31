@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Data;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Volt.Application.Dtos;
 using Volt.Application.Dtos.SolarAnalytics;
 using Volt.Application.Interfaces;
@@ -29,11 +30,16 @@ namespace Volt.Infrastructure.Services
 
         private readonly DataContext _context;
         private readonly IAdminAuditService _audit;
+        private readonly IWhatsappInteractionNotificationQueue _notificationQueue;
 
-        public SolarAnalyticsService(DataContext context, IAdminAuditService audit)
+        public SolarAnalyticsService(
+            DataContext context,
+            IAdminAuditService audit,
+            IWhatsappInteractionNotificationQueue notificationQueue)
         {
             _context = context;
             _audit = audit;
+            _notificationQueue = notificationQueue;
         }
 
         public async Task<ApiResponse<IReadOnlyList<SolarProjectDto>>> SearchProjectsAsync(string? query, CancellationToken ct = default)
@@ -341,7 +347,7 @@ namespace Volt.Infrastructure.Services
             => LogPublicEventAsync(request, EventWebCalculation, ct);
 
         public Task<ApiResponse<SolarCalculationLogDto>> LogPublicWhatsappClickAsync(PublicSolarTrackingRequest request, CancellationToken ct = default)
-            => LogPublicEventAsync(request, EventWebWhatsappClick, ct);
+            => LogPublicEventAsync(request, EventWebWhatsappClick, ct, includeRequestMetadata: true);
 
         public async Task<ApiResponse<SolarAnalyticsDashboardDto>> GetDashboardAsync(DateTime? from, DateTime? to, CancellationToken ct = default)
         {
@@ -449,6 +455,7 @@ namespace Volt.Infrastructure.Services
                     .Select(x => new SolarAnalyticsBreakdownDto(x.Key, x.Count()))
                     .ToList(),
                 topProjects,
+                BuildOutOfStockDemand(logs),
                 recentLogActivities.Concat(recentDocumentActivities)
                     .OrderByDescending(x => x.CreatedAt)
                     .Take(20)
@@ -457,11 +464,18 @@ namespace Volt.Infrastructure.Services
             return ApiResponse<SolarAnalyticsDashboardDto>.SuccessResponse(dashboard);
         }
 
-        private async Task<ApiResponse<SolarCalculationLogDto>> LogPublicEventAsync(PublicSolarTrackingRequest request, string eventType, CancellationToken ct)
+        private async Task<ApiResponse<SolarCalculationLogDto>> LogPublicEventAsync(
+            PublicSolarTrackingRequest request,
+            string eventType,
+            CancellationToken ct,
+            bool includeRequestMetadata = false)
         {
             try
             {
                 var now = GetAzerbaijanNow();
+                var payloadJson = includeRequestMetadata
+                    ? BuildWhatsappPayloadJson(request, now)
+                    : ToPayloadJson(request.Payload);
                 var log = CreateCalculationLog(
                     SourceWeb,
                     eventType,
@@ -469,11 +483,16 @@ namespace Volt.Infrastructure.Services
                     null,
                     request.Language,
                     request.SessionId,
-                    ToPayloadJson(request.Payload),
+                    payloadJson,
                     now);
 
                 _context.SolarCalculationLogs.Add(log);
                 await _context.SaveChangesAsync(ct);
+
+                if (eventType == EventWebWhatsappClick)
+                {
+                    QueueWhatsappNotification(request.Language, payloadJson, now);
+                }
 
                 return ApiResponse<SolarCalculationLogDto>.SuccessResponse(new SolarCalculationLogDto(0, log.Id));
             }
@@ -483,6 +502,194 @@ namespace Volt.Infrastructure.Services
                     ErrorCode.SERVER_ERROR,
                     "An error occurred while logging the public calculator event.");
             }
+        }
+
+        private void QueueWhatsappNotification(string? language, string payloadJson, DateTime occurredAt)
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(payloadJson);
+                var root = document.RootElement;
+                var interactionType = ReadDemandString(root, "interactionType");
+                var topic = interactionType switch
+                {
+                    "out_of_stock_check" => WhatsappNotificationTopics.Yoxla,
+                    "calculator_quote" => WhatsappNotificationTopics.Qiymetlendirme,
+                    _ => string.Empty
+                };
+                if (topic.Length == 0) return;
+
+                _notificationQueue.TryEnqueue(new WhatsappInteractionNotification(
+                    topic,
+                    Limit(language ?? string.Empty, 10),
+                    payloadJson,
+                    occurredAt));
+            }
+            catch (JsonException)
+            {
+                // The analytics row has already been saved. A malformed payload must
+                // never turn the customer's WhatsApp action into a failed request.
+            }
+        }
+
+        private static string BuildWhatsappPayloadJson(PublicSolarTrackingRequest request, DateTime serverReceivedAt)
+        {
+            const int maxPayloadCharacters = 32_000;
+            var rawPayload = request.Payload.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+                ? "{}"
+                : request.Payload.GetRawText();
+            if (rawPayload.Length > maxPayloadCharacters)
+            {
+                throw new JsonException("WhatsApp analytics payload is too large.");
+            }
+
+            var root = JsonNode.Parse(rawPayload) as JsonObject ?? new JsonObject();
+            root["requestMetadata"] = new JsonObject
+            {
+                ["deviceId"] = Limit(request.DeviceId, 100),
+                ["sessionId"] = Limit(request.SessionId, 100),
+                ["interactionId"] = Limit(request.InteractionId, 100),
+                ["clientOccurredAt"] = request.ClientOccurredAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                ["serverReceivedAt"] = serverReceivedAt.ToString("O", CultureInfo.InvariantCulture),
+                ["ipAddress"] = Limit(request.ClientIpAddress, 64),
+                ["userAgent"] = Limit(request.RequestUserAgent, 512),
+                ["referrer"] = Limit(request.RequestReferrer, 1_000),
+            };
+
+            return root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+        }
+
+        private static IReadOnlyList<WhatsappProductDemandDto> BuildOutOfStockDemand(IEnumerable<SolarCalculationLog> logs)
+        {
+            var demand = new Dictionary<string, WhatsappDemandAccumulator>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var log in logs.Where(x => x.EventType == EventWebWhatsappClick))
+            {
+                try
+                {
+                    using var document = JsonDocument.Parse(log.PayloadJson);
+                    var root = document.RootElement;
+                    if (!root.TryGetProperty("interactionType", out var interactionType)
+                        || !string.Equals(interactionType.GetString(), "out_of_stock_check", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var deviceId = ReadNestedString(root, "requestMetadata", "deviceId");
+                    if (root.TryGetProperty("product", out var product) && product.ValueKind == JsonValueKind.Object)
+                    {
+                        AddDemandItem(demand, product, deviceId, log.CreatedAt);
+                    }
+
+                    if (root.TryGetProperty("products", out var products) && products.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var productItem in products.EnumerateArray().Take(20))
+                        {
+                            if (productItem.ValueKind == JsonValueKind.Object)
+                            {
+                                AddDemandItem(demand, productItem, deviceId, log.CreatedAt);
+                            }
+                        }
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Historical or malformed analytics payloads are ignored in the demand summary.
+                }
+            }
+
+            return demand.Values
+                .OrderByDescending(x => x.Initiations)
+                .ThenByDescending(x => x.RequestedUnits)
+                .ThenByDescending(x => x.LastInteractionAt)
+                .Take(100)
+                .Select(x => new WhatsappProductDemandDto(
+                    x.ProductId,
+                    x.ProductName,
+                    x.Category,
+                    x.SubCategory,
+                    x.Brand,
+                    x.Variant,
+                    x.Initiations,
+                    x.RequestedUnits,
+                    x.DeviceIds.Count,
+                    x.LastInteractionAt))
+                .ToList();
+        }
+
+        private static void AddDemandItem(
+            IDictionary<string, WhatsappDemandAccumulator> demand,
+            JsonElement product,
+            string deviceId,
+            DateTime createdAt)
+        {
+            var productId = ReadDemandString(product, "id");
+            var productName = ReadDemandString(product, "name");
+            var variant = ReadDemandString(product, "variant");
+            if (string.IsNullOrWhiteSpace(productId) && string.IsNullOrWhiteSpace(productName)) return;
+
+            var key = $"{productId}|{productName}|{variant}";
+            if (!demand.TryGetValue(key, out var item))
+            {
+                item = new WhatsappDemandAccumulator
+                {
+                    ProductId = productId,
+                    ProductName = productName,
+                    Category = ReadDemandString(product, "category"),
+                    SubCategory = ReadDemandString(product, "subCategory"),
+                    Brand = ReadDemandString(product, "brand"),
+                    Variant = variant,
+                    LastInteractionAt = createdAt,
+                };
+                demand[key] = item;
+            }
+
+            item.Initiations += 1;
+            item.RequestedUnits += Math.Max(1, ReadInteger(product, "requestedQuantity"));
+            if (!string.IsNullOrWhiteSpace(deviceId)) item.DeviceIds.Add(deviceId);
+            if (createdAt > item.LastInteractionAt) item.LastInteractionAt = createdAt;
+        }
+
+        private static string ReadNestedString(JsonElement root, string objectName, string propertyName)
+            => root.TryGetProperty(objectName, out var nested) && nested.ValueKind == JsonValueKind.Object
+                ? ReadDemandString(nested, propertyName)
+                : string.Empty;
+
+        private static string ReadDemandString(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var property)) return string.Empty;
+            return property.ValueKind == JsonValueKind.String
+                ? property.GetString()?.Trim() ?? string.Empty
+                : property.ValueKind == JsonValueKind.Number
+                    ? property.GetRawText()
+                    : string.Empty;
+        }
+
+        private static int ReadInteger(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var property)) return 0;
+            if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var number)) return number;
+            return property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out number) ? number : 0;
+        }
+
+        private static string Limit(string value, int maxLength)
+        {
+            var normalized = value?.Trim() ?? string.Empty;
+            return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+        }
+
+        private sealed class WhatsappDemandAccumulator
+        {
+            public string ProductId { get; init; } = string.Empty;
+            public string ProductName { get; init; } = string.Empty;
+            public string Category { get; init; } = string.Empty;
+            public string SubCategory { get; init; } = string.Empty;
+            public string Brand { get; init; } = string.Empty;
+            public string Variant { get; init; } = string.Empty;
+            public int Initiations { get; set; }
+            public int RequestedUnits { get; set; }
+            public HashSet<string> DeviceIds { get; } = new(StringComparer.Ordinal);
+            public DateTime LastInteractionAt { get; set; }
         }
 
         private async Task<SolarSalesProject> ResolveProjectAsync(string projectName, DateTime now, CancellationToken ct)

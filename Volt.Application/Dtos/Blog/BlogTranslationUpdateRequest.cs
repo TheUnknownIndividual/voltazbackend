@@ -19,6 +19,15 @@ namespace Volt.Application.Dtos.Blog
         [Required]
         public string Content { get; set; }
 
+        [MaxLength(200)]
+        public string SeoTitle { get; set; }
+
+        [MaxLength(500)]
+        public string SeoDescription { get; set; }
+
+        [MaxLength(500)]
+        public string SeoKeywords { get; set; }
+
         public bool IsActive { get; set; } = true;
     }
 }

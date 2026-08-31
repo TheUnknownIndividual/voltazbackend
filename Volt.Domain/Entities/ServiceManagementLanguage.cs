@@ -18,6 +18,10 @@ namespace Volt.Domain.Entities
         public string Content2 { get; set; }
         public string Content3 { get; set; }
         public string Content4 { get; set; }
+        public string DetailContentHtml { get; set; }
+        public string SeoTitle { get; set; }
+        public string SeoDescription { get; set; }
+        public string SeoKeywords { get; set; }
         public bool IsActive { get; set; }
 
         public ServiceManagement ServiceManagement { get; set; }

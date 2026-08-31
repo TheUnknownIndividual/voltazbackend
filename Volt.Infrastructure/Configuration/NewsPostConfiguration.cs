@@ -16,6 +16,19 @@ namespace Volt.Infrastructure.Configuration
                 .IsRequired()
                 .HasMaxLength(500);
 
+            builder.Property(x => x.CoverImagePositionX)
+                .IsRequired()
+                .HasDefaultValue(50);
+
+            builder.Property(x => x.CoverImagePositionY)
+                .IsRequired()
+                .HasDefaultValue(50);
+
+            builder.Property(x => x.CoverImageZoom)
+                .IsRequired()
+                .HasPrecision(4, 2)
+                .HasDefaultValue(1m);
+
             builder.Property(x => x.Source)
                 .IsRequired()
                 .HasMaxLength(200);

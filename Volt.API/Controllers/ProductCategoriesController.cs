@@ -26,8 +26,28 @@ namespace Volt.API.Controllers
             => CreateActionResult(await _service.CreateAsync(request, _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
 
         [HttpGet]
-        public async Task<IActionResult> GetAll(CancellationToken ct)
-            => CreateActionResult(await _service.GetAllAsync(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+        public async Task<IActionResult> GetAll([FromQuery] bool includeAllLanguages, CancellationToken ct)
+            => CreateActionResult(await _service.GetAllAsync(
+                includeAllLanguages
+                    ? null
+                    : _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()),
+                ct));
+
+        [HttpGet("homepage")]
+        public async Task<IActionResult> GetHomePage(CancellationToken ct)
+            => CreateActionResult(await _service.GetHomePageAsync(_acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()), ct));
+
+        [HttpGet("seo/{seoKey}")]
+        public async Task<IActionResult> GetBySeoKey(string seoKey, CancellationToken ct)
+            => CreateActionResult(await _service.GetBySeoKeyAsync(
+                seoKey,
+                _acceptLanguageService.Resolve(Request.Headers.AcceptLanguage.ToString()),
+                ct));
+
+        [Authorize]
+        [HttpGet("{id:int}/product-options")]
+        public async Task<IActionResult> GetProductOptions(int id, CancellationToken ct)
+            => CreateActionResult(await _service.GetProductOptionsAsync(id, ct));
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id, CancellationToken ct)

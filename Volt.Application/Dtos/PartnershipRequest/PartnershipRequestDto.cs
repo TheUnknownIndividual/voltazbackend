@@ -10,6 +10,8 @@ namespace Volt.Application.Dtos.PartnershipRequest
         byte Status,
         int PartnershipTypeId,
         DateTime CreatedAt,
-        DateTime? UpdatedAt
+        DateTime? UpdatedAt,
+        bool IsViewedByAdmin,
+        DateTime? AdminViewedAt
     );
 }

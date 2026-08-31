@@ -38,7 +38,7 @@ public sealed class AccountingService : IAccountingService
                     x.EmploymentStartDate,
                     x.SalaryPaymentDate,
                     x.Role.ToString(),
-                    x.IsSuperAdmin,
+                    x.IsEffectiveSuperAdmin,
                     x.IsStakeholder,
                     x.TelegramChatId.HasValue)).ToList(),
             Projects = projectResults

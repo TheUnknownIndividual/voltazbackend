@@ -1,0 +1,17 @@
+namespace Volt.Domain.Entities
+{
+    public sealed class ProductAiImportJob
+    {
+        public Guid Id { get; set; }
+        public int CreatedByAdminId { get; set; }
+        public int? ProductId { get; set; }
+        public string Status { get; set; } = "queued";
+        public string RequestJson { get; set; } = string.Empty;
+        public string? DraftJson { get; set; }
+        public string? ErrorCode { get; set; }
+        public string? ErrorMessage { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public DateTime ExpiresAt { get; set; }
+    }
+}

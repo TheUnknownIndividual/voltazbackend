@@ -20,6 +20,16 @@ namespace Volt.Domain.Common
         public const string INVALID_PASSKEY_CHALLENGE = "Invalid passkey challenge";
         public const string PASSKEY_NOT_FOUND = "Passkey not found";
 
+        // Telegram connection codes are intentionally stable: the bot maps
+        // them to clear, actionable messages without exposing any token data.
+        public const string TELEGRAM_LINK_INVALID_FORMAT = "TELEGRAM_LINK_INVALID_FORMAT";
+        public const string TELEGRAM_LINK_NOT_FOUND = "TELEGRAM_LINK_NOT_FOUND";
+        public const string TELEGRAM_LINK_SECRET_MISMATCH = "TELEGRAM_LINK_SECRET_MISMATCH";
+        public const string TELEGRAM_LINK_EXPIRED = "TELEGRAM_LINK_EXPIRED";
+        public const string TELEGRAM_LINK_REDEEMED = "TELEGRAM_LINK_REDEEMED";
+        public const string TELEGRAM_ACCOUNT_INACTIVE = "TELEGRAM_ACCOUNT_INACTIVE";
+        public const string TELEGRAM_CHAT_ALREADY_LINKED = "TELEGRAM_CHAT_ALREADY_LINKED";
+
 
         public const string ABOUT_NOT_FOUND = "About not found";
         public const string ABOUT_LANGUAGE_DUPLICATE = "Duplicate language exists for about";

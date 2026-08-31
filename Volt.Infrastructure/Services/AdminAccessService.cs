@@ -18,7 +18,9 @@ namespace Volt.Infrastructure.Services
                 .FirstOrDefaultAsync(x => x.Id == adminUserId && x.IsActive, ct);
             if (admin is null) return null;
 
-            var pages = admin.IsSuperAdmin
+            var isSuperAdmin = admin.IsEffectiveSuperAdmin;
+
+            var pages = isSuperAdmin
                 ? Enum.GetValues<AdminPage>().ToList()
                 : admin.PagePermissions.Select(x => x.Page).Distinct().OrderBy(x => x).ToList();
 
@@ -26,11 +28,11 @@ namespace Volt.Infrastructure.Services
                 admin.Id,
                 admin.Username,
                 string.IsNullOrWhiteSpace(admin.DisplayName) ? admin.Username : admin.DisplayName,
-                admin.IsSuperAdmin,
-                admin.IsSuperAdmin || admin.CanDeleteProjects,
-                admin.IsSuperAdmin || admin.CanEditProjects,
-                admin.IsSuperAdmin || admin.CanApproveWarehouseMovements,
-                admin.IsSuperAdmin || pages.Contains(AdminPage.Accounting),
+                isSuperAdmin,
+                isSuperAdmin || admin.CanDeleteProjects,
+                isSuperAdmin || admin.CanEditProjects,
+                isSuperAdmin || admin.CanApproveWarehouseMovements,
+                isSuperAdmin || pages.Contains(AdminPage.Accounting),
                 pages);
         }
 

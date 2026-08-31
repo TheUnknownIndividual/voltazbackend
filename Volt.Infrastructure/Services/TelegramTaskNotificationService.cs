@@ -1,8 +1,10 @@
 using System.Net.Http.Json;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Volt.Application.Dtos.AdminProjectTracker;
+using Volt.Application.Dtos.SolarAnalytics;
 using Microsoft.Extensions.Options;
 using Volt.Application.Configuration;
 using Volt.Application.Interfaces;
@@ -31,6 +33,12 @@ public sealed class TelegramTaskNotificationService : ITelegramTaskNotificationS
     public Task<string> SendProjectApprovalRequestAsync(long chatId, int requestId, string environmentScope, StakeholderApprovalNotification project, bool useRussian, CancellationToken ct = default)
         => SendAsync(chatId, FormatApprovalRequest(project, useRussian), ct,
             new { inline_keyboard = new[] { new[] { new { text = useRussian ? "✅ Одобрить" : "✅ Təsdiqlə", callback_data = $"project-approval:{environmentScope}:{requestId}:approve" }, new { text = useRussian ? "⛔ Отклонить" : "⛔ Rədd et", callback_data = $"project-approval:{environmentScope}:{requestId}:decline" } } } }, "HTML");
+
+    public Task<string> SendWhatsappInteractionAsync(
+        long chatId,
+        WhatsappInteractionNotification notification,
+        CancellationToken ct = default)
+        => SendAsync(chatId, FormatWhatsappInteraction(notification), ct, parseMode: "HTML");
 
     private async Task<string> SendAsync(long chatId, string text, CancellationToken ct, object? replyMarkup = null, string? parseMode = null)
     {
@@ -130,6 +138,164 @@ public sealed class TelegramTaskNotificationService : ITelegramTaskNotificationS
         text.AppendLine();
         text.Append(language.Action);
         return Trim(text.ToString(), 4000);
+    }
+
+    internal static string FormatWhatsappInteraction(WhatsappInteractionNotification notification)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(notification.PayloadJson);
+            var root = document.RootElement;
+            var text = new StringBuilder();
+            var isYoxla = notification.Topic == WhatsappNotificationTopics.Yoxla;
+            text.AppendLine(isYoxla
+                ? "📦 <b>YENİ STOK SORĞUSU</b>"
+                : "☀️ <b>YENİ GÜNƏŞ QİYMƏTLƏNDİRMƏSİ</b>");
+            text.AppendLine(isYoxla
+                ? "<i>Müştəri stokda olmayan məhsul üçün “Yoxla” düyməsini seçdi.</i>"
+                : "<i>Müştəri hesablamadan sonra WhatsApp əlaqəsini seçdi.</i>");
+            text.AppendLine();
+            text.AppendLine($"🕒 <b>Vaxt:</b> {notification.OccurredAt:dd.MM.yyyy HH:mm}");
+
+            var pagePath = ReadNestedText(root, "page", "path");
+            var placement = ReadText(root, "placement");
+            var contactPhone = ReadText(root, "contactPhone");
+            if (!string.IsNullOrWhiteSpace(pagePath)) text.AppendLine($"📍 <b>Səhifə:</b> <code>{Encode(pagePath)}</code>");
+            if (!string.IsNullOrWhiteSpace(placement)) text.AppendLine($"🔎 <b>Mənbə:</b> <code>{Encode(placement)}</code>");
+            if (!string.IsNullOrWhiteSpace(notification.Language)) text.AppendLine($"🌐 <b>Dil:</b> {Encode(notification.Language.ToUpperInvariant())}");
+            if (!string.IsNullOrWhiteSpace(contactPhone)) text.AppendLine($"📞 <b>Telefon:</b> {Encode(Trim(contactPhone, 40))}");
+
+            if (isYoxla)
+            {
+                var productItems = new List<JsonElement>();
+                if (root.TryGetProperty("product", out var product) && product.ValueKind == JsonValueKind.Object)
+                    productItems.Add(product);
+                if (root.TryGetProperty("products", out var products) && products.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in products.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Object).Take(10))
+                        productItems.Add(item);
+                }
+
+                if (productItems.Count > 0)
+                {
+                    text.AppendLine();
+                    text.AppendLine(productItems.Count == 1 ? "🛒 <b>MƏHSUL</b>" : $"🛒 <b>MƏHSULLAR ({productItems.Count})</b>");
+                    for (var index = 0; index < productItems.Count; index++)
+                        AppendProductCard(text, productItems[index], index + 1, productItems.Count > 1);
+                }
+            }
+            else
+            {
+                var quoteDetails = ReadNestedText(root, "context", "quoteDetails");
+                if (!string.IsNullOrWhiteSpace(quoteDetails))
+                {
+                    text.AppendLine();
+                    text.AppendLine("📊 <b>HESABLAMA</b>");
+                    text.AppendLine($"<blockquote>{Encode(Trim(quoteDetails, 1_500))}</blockquote>");
+                }
+                else
+                {
+                    AppendCalculatorSummary(text, root);
+                }
+            }
+
+            var prefilledMessage = ReadText(root, "prefilledMessage");
+            if (!string.IsNullOrWhiteSpace(prefilledMessage))
+            {
+                text.AppendLine();
+                text.AppendLine("💬 <b>WHATSAPP MESAJI</b>");
+                text.AppendLine($"<blockquote>{Encode(Trim(prefilledMessage, 1_200))}</blockquote>");
+            }
+
+            var deviceId = ReadNestedText(root, "requestMetadata", "deviceId");
+            var interactionId = ReadNestedText(root, "requestMetadata", "interactionId");
+            if (!string.IsNullOrWhiteSpace(deviceId) || !string.IsNullOrWhiteSpace(interactionId))
+            {
+                text.AppendLine();
+                text.AppendLine("<blockquote expandable><b>🔐 Texniki məlumat</b>");
+                if (!string.IsNullOrWhiteSpace(deviceId)) text.AppendLine($"Device: <code>{Encode(Trim(deviceId, 100))}</code>");
+                if (!string.IsNullOrWhiteSpace(interactionId)) text.AppendLine($"Interaction: <code>{Encode(Trim(interactionId, 100))}</code>");
+                text.AppendLine("</blockquote>");
+            }
+
+            return Trim(text.ToString(), 3_900);
+        }
+        catch (JsonException)
+        {
+            return notification.Topic == WhatsappNotificationTopics.Yoxla
+                ? "📦 Yeni stok sorğusu — Yoxla\nDetalları Volt Analytics bölməsində yoxlayın."
+                : "☀️ Yeni günəş qiymətləndirmə sorğusu\nDetalları Volt Analytics bölməsində yoxlayın.";
+        }
+    }
+
+    private static void AppendProductCard(StringBuilder text, JsonElement product, int index, bool showIndex)
+    {
+        var name = ReadText(product, "name");
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var brand = ReadText(product, "brand");
+        var variant = ReadText(product, "variant");
+        var requested = ReadNumber(product, "requestedQuantity");
+        var available = ReadNumber(product, "availableStock");
+        text.AppendLine();
+        text.AppendLine(showIndex
+            ? $"<b>{index}. {Encode(Trim(name, 300))}</b>"
+            : $"<b>{Encode(Trim(name, 300))}</b>");
+        if (!string.IsNullOrWhiteSpace(brand)) text.AppendLine($"🏷 <b>Brend:</b> {Encode(brand)}");
+        if (!string.IsNullOrWhiteSpace(variant)) text.AppendLine($"⚙️ <b>Variant:</b> {Encode(variant)}");
+        text.Append($"🔢 <b>İstək:</b> {(requested ?? 1):0.##}");
+        if (available.HasValue) text.Append($"  ·  <b>Stok:</b> {available.Value:0.##}");
+        text.AppendLine();
+    }
+
+    private static void AppendCalculatorSummary(StringBuilder text, JsonElement root)
+    {
+        if (!root.TryGetProperty("context", out var context) || context.ValueKind != JsonValueKind.Object) return;
+        var inputs = context.TryGetProperty("inputs", out var inputValue) ? inputValue : default;
+        var result = context.TryGetProperty("result", out var resultValue) ? resultValue : default;
+        var summary = new List<string>();
+        AddSummary(summary, "Şəhər", ReadText(inputs, "city"));
+        AddSummary(summary, "Obyekt", ReadText(inputs, "propertyType"));
+        AddSummary(summary, "Sistem", ReadText(inputs, "systemType"));
+        AddSummary(summary, "Aylıq ödəniş", FormatNumber(ReadNumber(inputs, "bill"), " AZN"));
+        AddSummary(summary, "Güc", FormatNumber(ReadNumber(result, "power"), " kW"));
+        AddSummary(summary, "Qiymət", FormatNumber(ReadNumber(result, "price"), " AZN"));
+        if (summary.Count == 0) return;
+        text.AppendLine();
+        text.AppendLine("📊 <b>HESABLAMA</b>");
+        foreach (var line in summary) text.AppendLine($"• {Encode(line)}");
+    }
+
+    private static void AddSummary(ICollection<string> lines, string label, string value)
+    {
+        if (!string.IsNullOrWhiteSpace(value)) lines.Add($"{label}: {value}");
+    }
+
+    private static string FormatNumber(decimal? value, string suffix)
+        => value.HasValue ? $"{value.Value:0.##}{suffix}" : string.Empty;
+
+    private static string ReadNestedText(JsonElement root, string objectName, string propertyName)
+        => root.ValueKind == JsonValueKind.Object
+           && root.TryGetProperty(objectName, out var nested)
+           && nested.ValueKind == JsonValueKind.Object
+            ? ReadText(nested, propertyName)
+            : string.Empty;
+
+    private static string ReadText(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value)) return string.Empty;
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString()?.Trim() ?? string.Empty,
+            JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => value.GetRawText(),
+            _ => string.Empty
+        };
+    }
+
+    private static decimal? ReadNumber(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value)) return null;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var number)) return number;
+        return value.ValueKind == JsonValueKind.String && decimal.TryParse(value.GetString(), out number) ? number : null;
     }
 
     private static void AppendField(StringBuilder text, string label, string? value)

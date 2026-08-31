@@ -20,6 +20,8 @@ namespace Volt.Infrastructure.Configuration
             builder.Property(e => e.CanApproveWarehouseMovements).HasDefaultValue(false);
             builder.Property(e => e.IsStakeholder).HasDefaultValue(false);
             builder.Property(e => e.TelegramChatId);
+            builder.Property(e => e.ReceivesYoxlaNotifications).HasDefaultValue(false);
+            builder.Property(e => e.ReceivesQiymetlendirmeNotifications).HasDefaultValue(false);
             builder.Property(e => e.MonthlySalary).HasColumnType("decimal(18,2)");
             builder.Property(e => e.EmploymentStartDate).HasColumnType("date");
             builder.Property(e => e.SalaryPaymentDate).HasColumnType("date");

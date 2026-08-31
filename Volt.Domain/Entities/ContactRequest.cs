@@ -19,5 +19,7 @@ namespace Volt.Domain.Entities
         public bool IsActive { get; set; }
         public int ApplicationTypeId { get; set; }
         public ApplicationType ApplicationType { get; set; }
+        public bool IsViewedByAdmin { get; set; }
+        public DateTime? AdminViewedAt { get; set; }
     }
 }

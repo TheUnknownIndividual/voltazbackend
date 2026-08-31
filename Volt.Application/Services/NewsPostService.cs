@@ -72,6 +72,9 @@ namespace Volt.Application.Services
                 var newsPost = new NewsPost
                 {
                     CoverImagePath = request.CoverImagePath.Trim(),
+                    CoverImagePositionX = Math.Clamp(request.CoverImagePositionX, 0, 100),
+                    CoverImagePositionY = Math.Clamp(request.CoverImagePositionY, 0, 100),
+                    CoverImageZoom = Math.Clamp(request.CoverImageZoom, 1m, 3m),
                     Source = request.Source.Trim(),
                     PostLink = request.PostLink.Trim(),
                     IsActive = true,
@@ -91,6 +94,9 @@ namespace Volt.Application.Services
                         Title = language.Title.Trim(),
                         Description = language.Description.Trim(),
                         Content = language.Content.Trim(),
+                        SeoTitle = NormalizeOptional(language.SeoTitle),
+                        SeoDescription = NormalizeOptional(language.SeoDescription),
+                        SeoKeywords = NormalizeOptional(language.SeoKeywords),
                         IsActive = true
                     }, ct);
                 }
@@ -126,6 +132,9 @@ namespace Volt.Application.Services
             try
             {
                 newsPost.CoverImagePath = request.CoverImagePath.Trim();
+                newsPost.CoverImagePositionX = Math.Clamp(request.CoverImagePositionX, 0, 100);
+                newsPost.CoverImagePositionY = Math.Clamp(request.CoverImagePositionY, 0, 100);
+                newsPost.CoverImageZoom = Math.Clamp(request.CoverImageZoom, 1m, 3m);
                 newsPost.Source = request.Source.Trim();
                 newsPost.PostLink = request.PostLink.Trim();
                 newsPost.IsActive = request.IsActive;
@@ -213,6 +222,9 @@ namespace Volt.Application.Services
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
                         Content = item.Content.Trim(),
+                        SeoTitle = NormalizeOptional(item.SeoTitle),
+                        SeoDescription = NormalizeOptional(item.SeoDescription),
+                        SeoKeywords = NormalizeOptional(item.SeoKeywords),
                         IsActive = item.IsActive
                     }, ct);
                 }
@@ -224,6 +236,9 @@ namespace Volt.Application.Services
                         tracked.Title = item.Title.Trim();
                         tracked.Description = item.Description.Trim();
                         tracked.Content = item.Content.Trim();
+                        tracked.SeoTitle = NormalizeOptional(item.SeoTitle);
+                        tracked.SeoDescription = NormalizeOptional(item.SeoDescription);
+                        tracked.SeoKeywords = NormalizeOptional(item.SeoKeywords);
                         tracked.IsActive = item.IsActive;
                         languageRepo.Update(tracked);
                     }
@@ -248,6 +263,9 @@ namespace Volt.Application.Services
             return new(
                 newsPost.Id,
                 newsPost.CoverImagePath,
+                newsPost.CoverImagePositionX,
+                newsPost.CoverImagePositionY,
+                newsPost.CoverImageZoom,
                 newsPost.Source,
                 newsPost.PostLink,
                 newsPost.IsActive,
@@ -259,8 +277,14 @@ namespace Volt.Application.Services
                     x.Title,
                     x.Description,
                     x.Content,
+                    x.SeoTitle,
+                    x.SeoDescription,
+                    x.SeoKeywords,
                     x.IsActive)).ToList());
         }
+
+        private static string NormalizeOptional(string value)
+            => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
         
     }

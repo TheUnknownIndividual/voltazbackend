@@ -209,6 +209,29 @@ namespace Volt.Application.Services
             }
         }
 
+        public async Task<ApiResponse<PartnershipRequestDto>> MarkViewedAsync(int id, CancellationToken ct = default)
+        {
+            var repo = _uow.Repository<PartnershipRequest>();
+            var entity = await repo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
+
+            if (entity is null)
+            {
+                return ApiResponse<PartnershipRequestDto>.ErrorResponse(
+                    ErrorCode.PARTNERSHIP_REQUEST_NOT_FOUND,
+                    ErrorCode.PARTNERSHIP_REQUEST_NOT_FOUND);
+            }
+
+            if (!entity.IsViewedByAdmin)
+            {
+                entity.IsViewedByAdmin = true;
+                entity.AdminViewedAt = DateTime.UtcNow;
+                repo.Update(entity);
+                await _uow.SaveChangesAsync(ct);
+            }
+
+            return ApiResponse<PartnershipRequestDto>.SuccessResponse(MapToDto(entity));
+        }
+
         private async Task<bool> IsPartnershipTypeValidAsync(int partnershipTypeId, CancellationToken ct)
             => await _uow.Repository<PartnershipType>()
                 .AnyAsync(x => x.Id == partnershipTypeId && x.IsActive, ct);
@@ -254,7 +277,9 @@ namespace Volt.Application.Services
                 request.Status,
                 request.PartnershipTypeId,
                 request.CreatedAt,
-                request.UpdatedAt);
+                request.UpdatedAt,
+                request.IsViewedByAdmin,
+                request.AdminViewedAt);
 
         private static PartnershipRequestGetAllDto MapToGetAllDto(PartnershipRequest request, string? partnershipTypeName)
     => new(
@@ -263,6 +288,7 @@ namespace Volt.Application.Services
         request.PhoneNumber,
         partnershipTypeName,
         request.Status,
-        request.CreatedAt);
+        request.CreatedAt,
+        request.IsViewedByAdmin);
     }
 }

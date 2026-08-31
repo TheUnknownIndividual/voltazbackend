@@ -12,6 +12,7 @@ namespace Volt.Application.Dtos.PartnershipRequest
         string PhoneNumber,
         string PartnershipTypeName,
         byte Status,
-        DateTime CreatedAt
+        DateTime CreatedAt,
+        bool IsViewedByAdmin
     );
 }

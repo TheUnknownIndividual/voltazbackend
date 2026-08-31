@@ -201,6 +201,29 @@ namespace Volt.Application.Services
             }
         }
 
+        public async Task<ApiResponse<ServiceRequestDto>> MarkViewedAsync(int id, CancellationToken ct = default)
+        {
+            var repo = _uow.Repository<ServiceRequest>();
+            var entity = await repo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
+
+            if (entity is null)
+            {
+                return ApiResponse<ServiceRequestDto>.ErrorResponse(
+                    ErrorCode.SERVICE_REQUEST_NOT_FOUND,
+                    ErrorCode.SERVICE_REQUEST_NOT_FOUND);
+            }
+
+            if (!entity.IsViewedByAdmin)
+            {
+                entity.IsViewedByAdmin = true;
+                entity.AdminViewedAt = DateTime.UtcNow;
+                repo.Update(entity);
+                await _uow.SaveChangesAsync(ct);
+            }
+
+            return ApiResponse<ServiceRequestDto>.SuccessResponse(MapToDto(entity));
+        }
+
         private async Task<bool> IsServiceManagementValidAsync(int serviceManagementId, CancellationToken ct)
             => await _uow.Repository<ServiceManagement>()
                 .AnyAsync(x => x.Id == serviceManagementId && x.IsActive, ct);
@@ -231,6 +254,8 @@ namespace Volt.Application.Services
                 request.Status,
                 request.ServiceManagementId,
                 request.CreatedAt,
-                request.UpdatedAt);
+                request.UpdatedAt,
+                request.IsViewedByAdmin,
+                request.AdminViewedAt);
     }
 }

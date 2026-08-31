@@ -12,5 +12,12 @@ namespace Volt.Application.Dtos.ProdcutCategory
         [Required]
         [MinLength(1)]
         public List<ProductCategoryLanguageCreateRequest> Languages { get; set; }
+
+        public bool ShowOnHomePage { get; set; }
+
+        [Range(0, 5)]
+        public int HomePageDisplayOrder { get; set; }
+
+        public int? HomePageProductId { get; set; }
     }
 }

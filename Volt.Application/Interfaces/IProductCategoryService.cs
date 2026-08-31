@@ -14,6 +14,9 @@ namespace Volt.Application.Interfaces
         Task<ApiResponse<ProductCategoryDto>> CreateAsync(ProductCategoryCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<IReadOnlyList<ProductCategoryDto>>> GetAllAsync(LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<ProductCategoryDto>> GetByIdAsync(int id, CancellationToken ct = default);
+        Task<ApiResponse<ProductCategoryDto>> GetBySeoKeyAsync(string seoKey, LanguageCode? languageCode = null, CancellationToken ct = default);
+        Task<ApiResponse<IReadOnlyList<HomePageProductCategoryDto>>> GetHomePageAsync(LanguageCode? languageCode = null, CancellationToken ct = default);
+        Task<ApiResponse<IReadOnlyList<ProductCategoryProductOptionDto>>> GetProductOptionsAsync(int id, CancellationToken ct = default);
         Task<ApiResponse<ProductCategoryDto>> UpdateAsync(int id, ProductCategoryUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default);
         Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default);
     }

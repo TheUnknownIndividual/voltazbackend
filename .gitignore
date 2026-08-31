@@ -365,3 +365,10 @@ FodyWeavers.xsd
 
 /secrets 
 /Volt.API/appsettings.Development.json
+/Volt.API/meta-inbox.production.json
+/Volt.API/openai.production.json
+
+# Local credentials, OS metadata, and generated deployment packages
+.DS_Store
+**/client_secret_*.json
+/deploy/

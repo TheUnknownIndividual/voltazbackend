@@ -25,9 +25,16 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<ServiceManagementDto>> CreateAsync(ServiceManagementCreateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var validationError = ValidateRequest(request.Languages);
-            if (validationError is not null)
+            if (validationError is not null || !Enum.IsDefined(request.Category))
             {
-                return ApiResponse<ServiceManagementDto>.ErrorResponse(validationError, validationError);
+                var error = validationError ?? ErrorCode.INVALID_SERVICE_REQUEST;
+                return ApiResponse<ServiceManagementDto>.ErrorResponse(error, error);
+            }
+
+            var normalizedSlug = NormalizeSlug(request.DetailPageSlug);
+            if (normalizedSlug is not null && await _uow.Repository<ServiceManagement>().AnyAsync(x => x.DetailPageSlug == normalizedSlug, ct))
+            {
+                return ApiResponse<ServiceManagementDto>.ErrorResponse(ErrorCode.INVALID_SERVICE_REQUEST, "Service page URL is already in use");
             }
 
             try
@@ -37,6 +44,10 @@ namespace Volt.Application.Services
                 {
                     IsActive = true,
                     Icon = request.Icon,
+                    Category = request.Category,
+                    ReadMoreUrl = NormalizeOptional(request.ReadMoreUrl),
+                    DetailPageSlug = normalizedSlug,
+                    BannerImageUrl = NormalizeOptional(request.BannerImageUrl),
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -51,10 +62,14 @@ namespace Volt.Application.Services
                         LanguageCode = language.LanguageCode,
                         Title = language.Title.Trim(),
                         Description = language.Description.Trim(),
-                        Content1 = language.Content1.Trim(),
-                        Content2 = language.Content2.Trim(),
-                        Content3 = language.Content3.Trim(),
-                        Content4 = language.Content4.Trim(),
+                        Content1 = NormalizeOptional(language.Content1),
+                        Content2 = NormalizeOptional(language.Content2),
+                        Content3 = NormalizeOptional(language.Content3),
+                        Content4 = NormalizeOptional(language.Content4),
+                        DetailContentHtml = NormalizeOptional(language.DetailContentHtml),
+                        SeoTitle = NormalizeOptional(language.SeoTitle),
+                        SeoDescription = NormalizeOptional(language.SeoDescription),
+                        SeoKeywords = NormalizeOptional(language.SeoKeywords),
                         IsActive = true,
                     }, ct);
                 }
@@ -100,6 +115,67 @@ namespace Volt.Application.Services
             return ApiResponse<ServiceManagementDto>.SuccessResponse(dto);
         }
 
+        public async Task<ApiResponse<ServiceManagementDto>> GetBySlugAsync(string slug, LanguageCode? languageCode = null, CancellationToken ct = default)
+        {
+            var normalizedSlug = NormalizeSlug(slug);
+            var service = await _uow.Repository<ServiceManagement>()
+                .FirstOrDefaultNoTrackingAsync(x => x.IsActive && x.DetailPageSlug == normalizedSlug, ct);
+
+            if (service is null)
+            {
+                return ApiResponse<ServiceManagementDto>.ErrorResponse(ErrorCode.SERVICE_NOT_FOUND, "Service page not found");
+            }
+
+            var dto = await BuildServiceDtoAsync(service.Id, languageCode, ct);
+            return ApiResponse<ServiceManagementDto>.SuccessResponse(dto);
+        }
+
+        public async Task<ApiResponse<IReadOnlyList<ServiceCategorySettingDto>>> GetCategorySettingsAsync(CancellationToken ct = default)
+        {
+            var settings = await _uow.Repository<ServiceCategorySetting>().ListNoTrackingAsync(ct);
+            var result = Enum.GetValues<ServiceCategory>()
+                .Select(category => new ServiceCategorySettingDto(
+                    category,
+                    settings.FirstOrDefault(x => x.Category == category)?.IsReadMoreEnabled
+                        ?? category == ServiceCategory.Corporate))
+                .ToList();
+
+            return ApiResponse<IReadOnlyList<ServiceCategorySettingDto>>.SuccessResponse(result);
+        }
+
+        public async Task<ApiResponse<ServiceCategorySettingDto>> UpdateCategorySettingAsync(
+            ServiceCategory category,
+            ServiceCategorySettingUpdateRequest request,
+            CancellationToken ct = default)
+        {
+            if (!Enum.IsDefined(category))
+            {
+                return ApiResponse<ServiceCategorySettingDto>.ErrorResponse(ErrorCode.INVALID_SERVICE_REQUEST, "Invalid service category");
+            }
+
+            var repository = _uow.Repository<ServiceCategorySetting>();
+            var setting = await repository.FirstOrDefaultAsync(x => x.Category == category, ct);
+            if (setting is null)
+            {
+                setting = new ServiceCategorySetting
+                {
+                    Category = category,
+                    IsReadMoreEnabled = request.IsReadMoreEnabled,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await repository.AddAsync(setting, ct);
+            }
+            else
+            {
+                setting.IsReadMoreEnabled = request.IsReadMoreEnabled;
+                setting.UpdatedAt = DateTime.UtcNow;
+                repository.Update(setting);
+            }
+
+            await _uow.SaveChangesAsync(ct);
+            return ApiResponse<ServiceCategorySettingDto>.SuccessResponse(new ServiceCategorySettingDto(category, setting.IsReadMoreEnabled));
+        }
+
         public async Task<ApiResponse<ServiceManagementDto>> UpdateAsync(int id, ServiceManagementUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var serviceRepo = _uow.Repository<ServiceManagement>();
@@ -112,9 +188,16 @@ namespace Volt.Application.Services
 
             var validationError = ValidateRequest(request.Languages);
 
-            if (validationError is not null)
+            if (validationError is not null || !Enum.IsDefined(request.Category))
             {
-                return ApiResponse<ServiceManagementDto>.ErrorResponse(validationError, validationError);
+                var error = validationError ?? ErrorCode.INVALID_SERVICE_REQUEST;
+                return ApiResponse<ServiceManagementDto>.ErrorResponse(error, error);
+            }
+
+            var normalizedSlug = NormalizeSlug(request.DetailPageSlug);
+            if (normalizedSlug is not null && await serviceRepo.AnyAsync(x => x.Id != id && x.DetailPageSlug == normalizedSlug, ct))
+            {
+                return ApiResponse<ServiceManagementDto>.ErrorResponse(ErrorCode.INVALID_SERVICE_REQUEST, "Service page URL is already in use");
             }
 
             try
@@ -122,6 +205,10 @@ namespace Volt.Application.Services
                 
                 service.UpdatedAt = DateTime.UtcNow;
                 service.Icon = request.Icon;
+                service.Category = request.Category;
+                service.ReadMoreUrl = NormalizeOptional(request.ReadMoreUrl);
+                service.DetailPageSlug = normalizedSlug;
+                service.BannerImageUrl = NormalizeOptional(request.BannerImageUrl);
 
                 serviceRepo.Update(service);
 
@@ -177,10 +264,20 @@ namespace Volt.Application.Services
             }
         }
 
-        private string? ValidateRequest<TLanguage>(IEnumerable<TLanguage> languages)
+        private string ValidateRequest<TLanguage>(IEnumerable<TLanguage> languages)
             where TLanguage : class
         {
             if (languages is null || !languages.Any())
+            {
+                return ErrorCode.INVALID_SERVICE_REQUEST;
+            }
+
+            if (languages.Any(x => x switch
+                {
+                    ServiceManagementLanguageCreateRequest c => !Enum.IsDefined(c.LanguageCode) || string.IsNullOrWhiteSpace(c.Title) || string.IsNullOrWhiteSpace(c.Description),
+                    ServiceManagementLanguageUpdateRequest u => !Enum.IsDefined(u.LanguageCode) || string.IsNullOrWhiteSpace(u.Title) || string.IsNullOrWhiteSpace(u.Description),
+                    _ => true
+                }))
             {
                 return ErrorCode.INVALID_SERVICE_REQUEST;
             }
@@ -222,10 +319,14 @@ namespace Volt.Application.Services
                         LanguageCode = item.LanguageCode,
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
-                        Content1 = item.Content1.Trim(),
-                        Content2 = item.Content2.Trim(),
-                        Content3 = item.Content3.Trim(),
-                        Content4 = item.Content4.Trim(),
+                        Content1 = NormalizeOptional(item.Content1),
+                        Content2 = NormalizeOptional(item.Content2),
+                        Content3 = NormalizeOptional(item.Content3),
+                        Content4 = NormalizeOptional(item.Content4),
+                        DetailContentHtml = NormalizeOptional(item.DetailContentHtml),
+                        SeoTitle = NormalizeOptional(item.SeoTitle),
+                        SeoDescription = NormalizeOptional(item.SeoDescription),
+                        SeoKeywords = NormalizeOptional(item.SeoKeywords),
                         IsActive = item.IsActive,
                     }, ct);
                 }
@@ -236,10 +337,14 @@ namespace Volt.Application.Services
                     {
                         trackedLanguage.Title = item.Title.Trim();
                         trackedLanguage.Description = item.Description.Trim();
-                        trackedLanguage.Content1 = item.Content1.Trim();
-                        trackedLanguage.Content2 = item.Content2.Trim();
-                        trackedLanguage.Content3 = item.Content3.Trim();
-                        trackedLanguage.Content4 = item.Content4.Trim();
+                        trackedLanguage.Content1 = NormalizeOptional(item.Content1);
+                        trackedLanguage.Content2 = NormalizeOptional(item.Content2);
+                        trackedLanguage.Content3 = NormalizeOptional(item.Content3);
+                        trackedLanguage.Content4 = NormalizeOptional(item.Content4);
+                        trackedLanguage.DetailContentHtml = NormalizeOptional(item.DetailContentHtml);
+                        trackedLanguage.SeoTitle = NormalizeOptional(item.SeoTitle);
+                        trackedLanguage.SeoDescription = NormalizeOptional(item.SeoDescription);
+                        trackedLanguage.SeoKeywords = NormalizeOptional(item.SeoKeywords);
                         trackedLanguage.IsActive = item.IsActive;
                         languageRepo.Update(trackedLanguage);
                     }
@@ -255,14 +360,24 @@ namespace Volt.Application.Services
         }
         private ServiceManagementDto MapToServiceManagementDto(ServiceManagement service, IEnumerable<ServiceManagementLanguage> languages, LanguageCode? languageCode)
         {
+            var languageList = languages.ToList();
             var filteredLanguages = languageCode is null
-                ? languages
-                : languages.Where(x => x.LanguageCode == languageCode);
+                ? languageList
+                : languageList.Where(x => x.LanguageCode == languageCode).ToList();
+
+            if (languageCode is not null && !filteredLanguages.Any())
+            {
+                filteredLanguages = languageList.Where(x => x.LanguageCode == LanguageCode.AZ).ToList();
+            }
 
             return new ServiceManagementDto(
                 service.Id,
                 service.IsActive,
                 service.Icon,
+                service.Category,
+                service.ReadMoreUrl,
+                service.DetailPageSlug,
+                service.BannerImageUrl,
                 service.CreatedAt,
                 service.UpdatedAt,
                 filteredLanguages.Select(x => new ServiceManagementLanguageDto(
@@ -274,7 +389,19 @@ namespace Volt.Application.Services
                     x.Content2,
                     x.Content3,
                     x.Content4,
+                    x.DetailContentHtml,
+                    x.SeoTitle,
+                    x.SeoDescription,
+                    x.SeoKeywords,
                     x.IsActive)).ToList());
         }
+
+        private static string NormalizeOptional(string value)
+            => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        private static string NormalizeSlug(string value)
+            => string.IsNullOrWhiteSpace(value)
+                ? null
+                : value.Trim().Trim('/').ToLowerInvariant();
     }
 }

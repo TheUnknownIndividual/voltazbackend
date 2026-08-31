@@ -8,6 +8,9 @@ namespace Volt.Application.Dtos.NewsPost
         string Title,
         string Description,
         string Content,
+        string SeoTitle,
+        string SeoDescription,
+        string SeoKeywords,
         bool IsActive
     );
 }

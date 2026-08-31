@@ -27,6 +27,21 @@ namespace Volt.Infrastructure.Configuration
             builder.Property(x => x.Description)
                 .IsRequired();
 
+            builder.Property(x => x.DetailContentHtml)
+                .IsRequired(false);
+
+            builder.Property(x => x.SeoTitle)
+                .IsRequired(false)
+                .HasMaxLength(200);
+
+            builder.Property(x => x.SeoDescription)
+                .IsRequired(false)
+                .HasMaxLength(500);
+
+            builder.Property(x => x.SeoKeywords)
+                .IsRequired(false)
+                .HasMaxLength(500);
+
             builder.Property(x => x.IsActive)
                 .IsRequired()
                 .HasDefaultValue(true);

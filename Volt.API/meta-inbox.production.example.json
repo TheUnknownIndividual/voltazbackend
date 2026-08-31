@@ -1,0 +1,15 @@
+{
+  "MetaInbox": {
+    "Enabled": true,
+    "AppId": "replace-with-meta-app-id",
+    "AppSecret": "replace-with-meta-app-secret",
+    "VerifyToken": "replace-with-a-long-random-token",
+    "PageAccessToken": "replace-with-page-access-token",
+    "WhatsAppAccessToken": "replace-with-system-user-access-token",
+    "WhatsAppPhoneNumberId": "replace-with-phone-number-id",
+    "WhatsAppBusinessAccountId": "replace-with-waba-id",
+    "WhatsAppEmbeddedSignupConfigurationId": "replace-with-embedded-signup-configuration-id",
+    "WhatsAppOAuthRedirectUri": "https://volt.az/admin-dashboard/whatsapp-setup",
+    "GraphApiVersion": "v26.0"
+  }
+}

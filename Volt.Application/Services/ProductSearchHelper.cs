@@ -90,6 +90,28 @@ namespace Volt.Application.Services
             ["солнце"] = ["solar", "sun", "gunes", "günəş", "güneş", "солнечный", "солнечная", "солнце"]
         };
 
+        private static readonly string[] AzerbaijaniPluralSuffixes =
+        [
+            "larindan",
+            "lerinden",
+            "larinda",
+            "lerinde",
+            "larinin",
+            "lerinin",
+            "lardan",
+            "lerden",
+            "larin",
+            "lerin",
+            "larda",
+            "lerde",
+            "lara",
+            "lere",
+            "lari",
+            "leri",
+            "lar",
+            "ler"
+        ];
+
         public static string Normalize(string value)
             => (value ?? string.Empty).Trim().ToLowerInvariant();
 
@@ -223,7 +245,21 @@ namespace Volt.Application.Services
             var builder = new StringBuilder();
             foreach (var ch in Normalize(value))
             {
-                builder.Append(char.IsLetterOrDigit(ch) ? ch : ' ');
+                // Fold Azerbaijani letters explicitly for Latin-keyboard
+                // searches (for example, "gunes panel" -> "günəş paneli").
+                var normalizedCharacter = ch switch
+                {
+                    'ə' or 'Ə' => 'e',
+                    'ı' or 'İ' => 'i',
+                    'ö' or 'Ö' => 'o',
+                    'ü' or 'Ü' => 'u',
+                    'ş' or 'Ş' => 's',
+                    'ç' or 'Ç' => 'c',
+                    'ğ' or 'Ğ' => 'g',
+                    _ => ch
+                };
+
+                builder.Append(char.IsLetterOrDigit(normalizedCharacter) ? normalizedCharacter : ' ');
             }
 
             return string.Join(' ', builder.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries));
@@ -246,9 +282,46 @@ namespace Volt.Application.Services
                 : token;
 
         private static IReadOnlyList<string> ExpandToken(string token)
-            => Synonyms.TryGetValue(token, out var synonyms)
-                ? synonyms.Select(NormalizeToken).Distinct().ToList()
+        {
+            var synonymKey = ResolveSynonymKey(token);
+            var values = Synonyms.TryGetValue(synonymKey, out var synonyms)
+                ? synonyms.Append(token)
                 : [token];
+
+            return values
+                .Select(NormalizeForSearch)
+                .Select(NormalizeToken)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+        }
+
+        private static string ResolveSynonymKey(string token)
+        {
+            if (Synonyms.ContainsKey(token))
+            {
+                return token;
+            }
+
+            // Only stem to a word already present in the synonym catalogue. This
+            // supports Azerbaijani plural/case forms without broadly stemming words
+            // such as the English technical term "controller" to "control".
+            foreach (var suffix in AzerbaijaniPluralSuffixes)
+            {
+                if (token.Length <= suffix.Length + 2 || !token.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var candidate = token[..^suffix.Length];
+                if (Synonyms.ContainsKey(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            return token;
+        }
 
         private static bool IsTokenMatch(string valueToken, string queryToken)
         {

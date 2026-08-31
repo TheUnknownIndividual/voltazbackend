@@ -11,5 +11,6 @@ namespace Volt.Application.Interfaces
         Task<ApiResponse<ContactRequstDto>> UpdateAsync(int id, ContactRequstUpdateRequest request, CancellationToken ct = default);
         Task<ApiResponse<ContactRequstDto>> UpdateStatusAsync(int id, ContactRequstStatusUpdateRequest request, CancellationToken ct = default);
         Task<ApiResponse<NoContentDto>> DeleteAsync(int id, CancellationToken ct = default);
+        Task<ApiResponse<ContactRequstDto>> MarkViewedAsync(int id, CancellationToken ct = default);
     }
 }

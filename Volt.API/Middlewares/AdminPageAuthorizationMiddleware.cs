@@ -19,17 +19,19 @@ namespace Volt.API.Middlewares
             if (context.User.Identity?.IsAuthenticated != true ||
                 !string.Equals(context.User.FindFirstValue(ClaimTypes.Role), Role.Admin.ToString(), StringComparison.Ordinal) ||
                 !int.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), out var adminId) ||
-                !TryResolve(context.Request, out var page, out var needsProjectDelete, out var needsProjectEdit))
+                !TryResolve(context.Request, out var page, out var needsProjectDelete, out var needsProjectEdit, out var allowSettingsAccess))
             {
                 await _next(context);
                 return;
             }
 
-            var allowed = needsProjectDelete
-                ? await access.CanDeleteProjectsAsync(adminId, context.RequestAborted)
+            var session = await access.GetSessionAsync(adminId, context.RequestAborted);
+            var allowed = session is not null && (needsProjectDelete
+                ? session.CanDeleteProjects
                 : needsProjectEdit
-                    ? await access.CanEditProjectsAsync(adminId, context.RequestAborted)
-                    : await access.HasPageAsync(adminId, page, context.RequestAborted);
+                    ? session.CanEditProjects
+                    : session.IsSuperAdmin || session.AllowedPages.Contains(page) ||
+                      (allowSettingsAccess && session.AllowedPages.Contains(AdminPage.Settings)));
 
             if (allowed)
             {
@@ -51,11 +53,17 @@ namespace Volt.API.Middlewares
             });
         }
 
-        private static bool TryResolve(HttpRequest request, out AdminPage page, out bool needsProjectDelete, out bool needsProjectEdit)
+        private static bool TryResolve(
+            HttpRequest request,
+            out AdminPage page,
+            out bool needsProjectDelete,
+            out bool needsProjectEdit,
+            out bool allowSettingsAccess)
         {
             page = default;
             needsProjectDelete = false;
             needsProjectEdit = false;
+            allowSettingsAccess = false;
             var path = request.Path.Value?.ToLowerInvariant() ?? string.Empty;
 
             // The management endpoints do their own full-admin check in the controller.
@@ -63,6 +71,8 @@ namespace Volt.API.Middlewares
                 return false;
 
             if (path.StartsWith("/api/solaranalytics/dashboard")) { page = AdminPage.Analytics; return true; }
+            if (path.StartsWith("/api/meta-inbox/whatsapp-onboarding")) { page = AdminPage.WhatsAppOnboarding; return true; }
+            if (path.StartsWith("/api/meta-inbox")) { page = AdminPage.MessageInbox; return true; }
             if (path.StartsWith("/api/solaranalytics")) { page = AdminPage.SolarCalculator; return true; }
             if (path.StartsWith("/api/solarinverters/datasheets/qa")) { page = AdminPage.SolarInverterQa; return true; }
             if (path.StartsWith("/api/solarinverters")) { page = AdminPage.SolarCalculator; return true; }
@@ -86,11 +96,17 @@ namespace Volt.API.Middlewares
                 // Anonymous/customer public reads bypass this middleware; an admin token must have the page grant.
                 page = AdminPage.Projects;
                 needsProjectDelete = HttpMethods.IsDelete(request.Method);
+                allowSettingsAccess = true;
                 return true;
             }
-            if (path.StartsWith("/api/products") || path.StartsWith("/api/productcategories") ||
-                path.StartsWith("/api/productsubcategories") || path.StartsWith("/api/productbrands") ||
-                path.StartsWith("/api/producttechnologies")) { page = AdminPage.Warehouse; return true; }
+            if (path.StartsWith("/api/products")) { page = AdminPage.Warehouse; return true; }
+            if (path.StartsWith("/api/productcategories") || path.StartsWith("/api/productsubcategories") ||
+                path.StartsWith("/api/productbrands") || path.StartsWith("/api/producttechnologies"))
+            {
+                page = AdminPage.Warehouse;
+                allowSettingsAccess = true;
+                return true;
+            }
             if (path.StartsWith("/api/abouts") || path.StartsWith("/api/servicesmanagement") ||
                 path.StartsWith("/api/steps") || path.StartsWith("/api/applicationtypes") ||
                 path.StartsWith("/api/partnershiptypes") || path.StartsWith("/api/blogs") ||

@@ -32,7 +32,15 @@ namespace Volt.API.Controllers
                 return Unauthorized(ApiResponse<object>.ErrorResponse("AUTH_REFRESH_FAILED", "Authentication refresh is required."));
             }
 
-            _authCookieService.SetRefreshCookie(Response, session.RefreshToken);
+            // When another request (e.g. a second browser tab) already rotated this
+            // exact refresh token a moment earlier, we don't have a new raw token to
+            // hand back - the browser already holds the winning tab's refresh cookie
+            // from its own response, so leave the existing cookie untouched here.
+            if (!session.IssuedFromConcurrentRotation)
+            {
+                _authCookieService.SetRefreshCookie(Response, session.RefreshToken, session.Role);
+            }
+
             return CreateActionResult(ApiResponse<RefreshResponseDto>.SuccessResponse(new RefreshResponseDto
             {
                 AccessToken = session.AccessToken,

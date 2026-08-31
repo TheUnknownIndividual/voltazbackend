@@ -12,6 +12,8 @@ namespace Volt.Application.Dtos.ServiceRequest
         byte Status,
         int ServiceManagementId,
         DateTime CreatedAt,
-        DateTime? UpdatedAt
+        DateTime? UpdatedAt,
+        bool IsViewedByAdmin,
+        DateTime? AdminViewedAt
     );
 }

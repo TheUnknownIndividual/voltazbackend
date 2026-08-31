@@ -33,9 +33,38 @@ namespace Volt.Application.Services
             return ApiResponse<IReadOnlyList<BlogDto>>.SuccessResponse(result);
         }
 
+        public async Task<ApiResponse<IReadOnlyList<BlogDto>>> GetAllAdminAsync(LanguageCode? languageCode = null, CancellationToken ct = default)
+        {
+            var blogs = await _uow.Repository<Blog>().ListNoTrackingAsync(ct);
+            var translations = await _uow.Repository<BlogTranslation>().ListNoTrackingAsync(ct);
+            var translationsByBlog = translations.ToLookup(x => x.BlogId);
+
+            var result = blogs
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => MapToDto(
+                    x,
+                    translationsByBlog[x.Id].OrderBy(t => t.Id).ToList(),
+                    languageCode))
+                .ToList();
+
+            return ApiResponse<IReadOnlyList<BlogDto>>.SuccessResponse(result);
+        }
+
         public async Task<ApiResponse<BlogDto>> GetByIdAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var blog = await _uow.Repository<Blog>().FirstOrDefaultNoTrackingAsync(x => x.Id == id && x.IsActive, ct);
+            if (blog is null)
+            {
+                return ApiResponse<BlogDto>.ErrorResponse(ErrorCode.BLOG_NOT_FOUND, ErrorCode.BLOG_NOT_FOUND);
+            }
+
+            var dto = await BuildDtoAsync(id, null, ct);
+            return ApiResponse<BlogDto>.SuccessResponse(dto);
+        }
+
+        public async Task<ApiResponse<BlogDto>> GetByIdAdminAsync(int id, LanguageCode? languageCode = null, CancellationToken ct = default)
+        {
+            var blog = await _uow.Repository<Blog>().FirstOrDefaultNoTrackingAsync(x => x.Id == id, ct);
             if (blog is null)
             {
                 return ApiResponse<BlogDto>.ErrorResponse(ErrorCode.BLOG_NOT_FOUND, ErrorCode.BLOG_NOT_FOUND);
@@ -58,7 +87,7 @@ namespace Volt.Application.Services
                 var blog = new Blog
                 {
                     CoverImagePath = request.CoverImagePath.Trim(),
-                    IsActive = true,
+                    IsActive = request.IsActive,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = null
                 };
@@ -75,6 +104,9 @@ namespace Volt.Application.Services
                         Title = translation.Title.Trim(),
                         Description = translation.Description.Trim(),
                         Content = translation.Content.Trim(),
+                        SeoTitle = NormalizeOptional(translation.SeoTitle),
+                        SeoDescription = NormalizeOptional(translation.SeoDescription),
+                        SeoKeywords = NormalizeOptional(translation.SeoKeywords),
                         IsActive = true
                     }, ct);
                 }
@@ -95,7 +127,7 @@ namespace Volt.Application.Services
         public async Task<ApiResponse<BlogDto>> UpdateAsync(int id, BlogUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
         {
             var blogRepo = _uow.Repository<Blog>();
-            var blog = await blogRepo.FirstOrDefaultAsync(x => x.Id == id && x.IsActive, ct);
+            var blog = await blogRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
             if (blog is null)
             {
                 return ApiResponse<BlogDto>.ErrorResponse(ErrorCode.BLOG_NOT_FOUND, ErrorCode.BLOG_NOT_FOUND);
@@ -208,6 +240,9 @@ namespace Volt.Application.Services
                         Title = item.Title.Trim(),
                         Description = item.Description.Trim(),
                         Content = item.Content.Trim(),
+                        SeoTitle = NormalizeOptional(item.SeoTitle),
+                        SeoDescription = NormalizeOptional(item.SeoDescription),
+                        SeoKeywords = NormalizeOptional(item.SeoKeywords),
                         IsActive = item.IsActive
                     }, ct);
                 }
@@ -219,6 +254,9 @@ namespace Volt.Application.Services
                         tracked.Title = item.Title.Trim();
                         tracked.Description = item.Description.Trim();
                         tracked.Content = item.Content.Trim();
+                        tracked.SeoTitle = NormalizeOptional(item.SeoTitle);
+                        tracked.SeoDescription = NormalizeOptional(item.SeoDescription);
+                        tracked.SeoKeywords = NormalizeOptional(item.SeoKeywords);
                         tracked.IsActive = item.IsActive;
                         translationRepo.Update(tracked);
                     }
@@ -252,7 +290,31 @@ namespace Volt.Application.Services
                     x.Title,
                     x.Description,
                     x.Content,
+                    x.SeoTitle,
+                    x.SeoDescription,
+                    x.SeoKeywords,
                     x.IsActive)).ToList());
         }
+
+        public async Task<ApiResponse<BlogDto>> SetStatusAsync(int id, BlogStatusUpdateRequest request, LanguageCode? languageCode = null, CancellationToken ct = default)
+        {
+            var blogRepo = _uow.Repository<Blog>();
+            var blog = await blogRepo.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (blog is null)
+            {
+                return ApiResponse<BlogDto>.ErrorResponse(ErrorCode.BLOG_NOT_FOUND, ErrorCode.BLOG_NOT_FOUND);
+            }
+
+            blog.IsActive = request.IsActive;
+            blog.UpdatedAt = DateTime.UtcNow;
+            blogRepo.Update(blog);
+            await _uow.SaveChangesAsync(ct);
+
+            var dto = await BuildDtoAsync(id, languageCode, ct);
+            return ApiResponse<BlogDto>.SuccessResponse(dto);
+        }
+
+        private static string NormalizeOptional(string value)
+            => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }

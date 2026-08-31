@@ -49,6 +49,11 @@ namespace Volt.Application.Services
                 return ApiResponse<ProductDto>.ErrorResponse(descriptionLanguagesValidation, descriptionLanguagesValidation);
             }
 
+            if (HasMixedDatasheetMedia(request.ProductDatasheet))
+            {
+                return ApiResponse<ProductDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "A product datasheet collection must contain either PDFs or images, not both.");
+            }
+
             try
             {
                 var hasAvailableStock = HasAvailableStock(request.ProductParametrs);
@@ -62,6 +67,7 @@ namespace Volt.Application.Services
                     InStock = hasAvailableStock,
                     OutOfStockAt = hasAvailableStock ? null : DateTime.UtcNow,
                     InHomePage = request.InHomePage,
+                    UseCommonVariantContent = request.UseCommonVariantContent,
                     Certificate = request.Certificate,
                     IsActive = true
                 };
@@ -189,6 +195,11 @@ namespace Volt.Application.Services
                 .ThenByDescending(x => x.Id)
                 .ToList();
 
+            if (categoryId is null && subCategoryId is null)
+            {
+                products = InterleaveProductsByCategory(products);
+            }
+
             var totalCount = products.Count;
             var pagedProducts = products
                 .Skip((page - 1) * pageSize)
@@ -227,11 +238,62 @@ namespace Volt.Application.Services
         private static bool HasVisiblePrice(int productId, IEnumerable<ProductParametr> parametrs)
             => parametrs.Any(x => x.ProductId == productId && x.Amount > 0);
 
+        private static List<Product> InterleaveProductsByCategory(IReadOnlyCollection<Product> orderedProducts)
+        {
+            if (orderedProducts.Count < 2) return orderedProducts.ToList();
+
+            var categoryGroups = orderedProducts
+                .GroupBy(x => x.ProductCategoryId)
+                .OrderBy(x => x.Key)
+                .Select(x => x.ToList())
+                .ToList();
+
+            if (categoryGroups.Count < 2) return orderedProducts.ToList();
+
+            var result = new List<Product>(orderedProducts.Count);
+            var largestCategorySize = categoryGroups.Max(x => x.Count);
+            for (var productIndex = 0; productIndex < largestCategorySize; productIndex++)
+            {
+                foreach (var categoryProducts in categoryGroups)
+                {
+                    if (productIndex < categoryProducts.Count)
+                    {
+                        result.Add(categoryProducts[productIndex]);
+                    }
+                }
+            }
+
+            return result;
+        }
+
         private static bool HasPurchasableVariant(int productId, IEnumerable<ProductParametr> parametrs)
             => parametrs.Any(x => x.ProductId == productId && x.IsActive && x.Count.GetValueOrDefault() > 0 && x.Amount.GetValueOrDefault() > 0);
 
         private static bool HasAvailableStock(IEnumerable<ProductParametrCreateRequest> parametrs)
             => parametrs?.Any(x => x.Count > 0) == true;
+
+        private static bool HasMixedDatasheetMedia(IEnumerable<string>? datasheets)
+        {
+            var urls = (datasheets ?? [])
+                .Where(url => !string.IsNullOrWhiteSpace(url))
+                .Select(url => url.Split('?', '#')[0])
+                .ToList();
+
+            return urls.Any(url => url.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                && urls.Any(url => !url.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool HasSameDatasheetUrls(IEnumerable<string>? left, IEnumerable<string>? right)
+        {
+            var leftUrls = new HashSet<string>((left ?? [])
+                .Where(url => !string.IsNullOrWhiteSpace(url))
+                .Select(url => url.Trim()), StringComparer.OrdinalIgnoreCase);
+            var rightUrls = new HashSet<string>((right ?? [])
+                .Where(url => !string.IsNullOrWhiteSpace(url))
+                .Select(url => url.Trim()), StringComparer.OrdinalIgnoreCase);
+
+            return leftUrls.SetEquals(rightUrls);
+        }
 
         private static bool ProductHasAvailableStock(int productId, IEnumerable<ProductParametr> parametrs)
             => parametrs.Any(x => x.ProductId == productId && x.IsActive && x.Count.GetValueOrDefault() > 0);
@@ -350,6 +412,17 @@ namespace Volt.Application.Services
                 return ApiResponse<ProductDto>.ErrorResponse(descriptionLanguagesValidation, descriptionLanguagesValidation);
             }
 
+            if (HasMixedDatasheetMedia(request.ProductDatasheet))
+            {
+                var currentDatasheets = await _uow.Repository<ProductImage>()
+                    .ListNoTrackingAsync(image => image.ProductId == id && !image.Type, ct);
+                var currentUrls = currentDatasheets.Select(image => image.ImageUrl).ToList();
+                if (!HasMixedDatasheetMedia(currentUrls) || !HasSameDatasheetUrls(currentUrls, request.ProductDatasheet))
+                {
+                    return ApiResponse<ProductDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "A product datasheet collection must contain either PDFs or images, not both.");
+                }
+            }
+
             try
             {
                 var previousInStock = product.InStock;
@@ -369,6 +442,7 @@ namespace Volt.Application.Services
                     product.OutOfStockAt = null;
                 }
                 product.InHomePage = request.InHomePage;
+                product.UseCommonVariantContent = request.UseCommonVariantContent;
                 product.Certificate = request.Certificate;
                 productRepo.Update(product);
 
@@ -417,6 +491,11 @@ namespace Volt.Application.Services
             var product = await _uow.Repository<Product>().FirstOrDefaultNoTrackingAsync(x => x.Id == productId && x.IsActive, ct);
             var images = await _uow.Repository<ProductImage>().ListNoTrackingAsync(x => x.ProductId == productId, ct);
             var parametrs = await _uow.Repository<ProductParametr>().ListNoTrackingAsync(x => x.ProductId == productId && x.IsActive, ct);
+            var parametrIds = parametrs.Select(x => x.Id).ToHashSet();
+            var parametrLanguages = parametrIds.Count == 0
+                ? new List<ProductParametrLanguage>()
+                : await _uow.Repository<ProductParametrLanguage>().ListNoTrackingAsync(
+                    x => parametrIds.Contains(x.ProductParametrId) && x.IsActive, ct);
             var descriptions = await _uow.Repository<ProductDescription>().ListNoTrackingAsync(x => x.ProductId == productId, ct);
             var descriptionIds = descriptions.Select(d => d.Id).ToHashSet();
             var descriptionLanguages = descriptionIds.Count == 0
@@ -425,7 +504,7 @@ namespace Volt.Application.Services
                     x => descriptionIds.Contains(x.ProductDescriptionId) && x.IsActive, ct);
             var promotionIds = await GetActivePromotionIdsForProductAsync(productId, ct);
 
-            return MapToDto(product, images, parametrs, descriptions, descriptionLanguages, promotionIds);
+            return MapToDto(product, images, parametrs, descriptions, descriptionLanguages, promotionIds, parametrLanguages);
         }
 
         private async Task ReplaceProductImagesAsync(
@@ -473,30 +552,89 @@ namespace Volt.Application.Services
             CancellationToken ct)
         {
             var parametrRepo = _uow.Repository<ProductParametr>();
+            var languageRepo = _uow.Repository<ProductParametrLanguage>();
             var existingParametrs = await parametrRepo.ListNoTrackingAsync(x => x.ProductId == productId, ct);
-
-            foreach (var existing in existingParametrs)
-            {
-                var tracked = await parametrRepo.FirstOrDefaultAsync(x => x.Id == existing.Id, ct);
-                if (tracked is not null)
-                {
-                    parametrRepo.Remove(tracked);
-                }
-            }
+            var retainedIds = new HashSet<int>();
 
             foreach (var item in requestParametrs ?? [])
             {
+                var existing = item.Id.GetValueOrDefault() > 0
+                    ? await parametrRepo.FirstOrDefaultAsync(
+                        x => x.Id == item.Id.Value && x.ProductId == productId, ct)
+                    : null;
+
+                if (existing is not null)
+                {
+                    existing.ModelLabel = string.IsNullOrWhiteSpace(item.ModelLabel) ? null : item.ModelLabel.Trim();
+                    existing.TechnicalPower = item.TechnicalPower;
+                    existing.Effectiveness = item.Effectiveness;
+                    existing.Count = item.Count;
+                    existing.Amount = item.Amount;
+                    existing.IsActive = true;
+                    parametrRepo.Update(existing);
+                    retainedIds.Add(existing.Id);
+
+                    var oldLanguages = await languageRepo.ListNoTrackingAsync(
+                        x => x.ProductParametrId == existing.Id, ct);
+                    var retainedLanguageIds = new HashSet<int>();
+                    foreach (var language in NormalizeParametrLanguages(item.Languages))
+                    {
+                        var oldLanguage = oldLanguages.FirstOrDefault(x => x.LanguageCode == language.LanguageCode);
+                        if (oldLanguage is null)
+                        {
+                            language.ProductParametrId = existing.Id;
+                            await languageRepo.AddAsync(language, ct);
+                            continue;
+                        }
+                        var trackedLanguage = await languageRepo.FirstOrDefaultAsync(x => x.Id == oldLanguage.Id, ct);
+                        if (trackedLanguage is null) continue;
+                        trackedLanguage.Description = language.Description;
+                        trackedLanguage.Features = language.Features;
+                        trackedLanguage.IsActive = true;
+                        languageRepo.Update(trackedLanguage);
+                        retainedLanguageIds.Add(trackedLanguage.Id);
+                    }
+                    foreach (var oldLanguage in oldLanguages.Where(x => !retainedLanguageIds.Contains(x.Id)))
+                    {
+                        var trackedLanguage = await languageRepo.FirstOrDefaultAsync(x => x.Id == oldLanguage.Id, ct);
+                        if (trackedLanguage is not null) languageRepo.Remove(trackedLanguage);
+                    }
+                    continue;
+                }
+
                 await parametrRepo.AddAsync(new ProductParametr
                 {
                     ProductId = productId,
+                    ModelLabel = string.IsNullOrWhiteSpace(item.ModelLabel) ? null : item.ModelLabel.Trim(),
                     TechnicalPower = item.TechnicalPower,
                     Effectiveness = item.Effectiveness,
                     Count = item.Count,
                     Amount = item.Amount,
-                    IsActive = true
+                    IsActive = true,
+                    Languages = NormalizeParametrLanguages(item.Languages)
                 }, ct);
             }
+
+            foreach (var stale in existingParametrs.Where(x => !retainedIds.Contains(x.Id)))
+            {
+                var tracked = await parametrRepo.FirstOrDefaultAsync(x => x.Id == stale.Id, ct);
+                if (tracked is not null) parametrRepo.Remove(tracked);
+            }
         }
+
+        private static List<ProductParametrLanguage> NormalizeParametrLanguages(
+            IEnumerable<ProductParametrLanguageCreateRequest>? languages)
+            => (languages ?? [])
+                        .GroupBy(x => x.LanguageCode)
+                        .Select(x => x.First())
+                        .Select(language => new ProductParametrLanguage
+                        {
+                            LanguageCode = language.LanguageCode,
+                            Description = language.Description?.Trim() ?? string.Empty,
+                            Features = language.Features?.Trim() ?? string.Empty,
+                            IsActive = true
+                        })
+                        .ToList();
 
         private async Task ReplaceProductDescriptionsAsync(
             int productId,
@@ -739,15 +877,30 @@ namespace Volt.Application.Services
             IEnumerable<ProductParametr> parametrs,
             IEnumerable<ProductDescription> descriptions,
             IEnumerable<ProductDescriptionLanguage> descriptionLanguages,
-            IReadOnlyList<int> promotionIds)
+            IReadOnlyList<int> promotionIds,
+            IEnumerable<ProductParametrLanguage>? parametrLanguages = null)
         {
+            var variantLanguages = parametrLanguages?.ToList() ?? [];
             var productImageList = images.Where(x => x.Type).Select(x => x.ImageUrl).ToList();
             var productDatasheetList = images.Where(x => !x.Type).Select(x => x.ImageUrl).ToList();
             var parametrList = parametrs
                 .OrderByDescending(x => product.InStock && x.Count.GetValueOrDefault() > 0 && x.Amount.GetValueOrDefault() > 0)
                 .ThenByDescending(x => x.Count.GetValueOrDefault() > 0)
                 .ThenByDescending(x => x.Amount.GetValueOrDefault() > 0)
-                .Select(x => new ProductParametrDto(x.TechnicalPower, x.Effectiveness, x.Count, x.Amount))
+                .Select(x => new ProductParametrDto(
+                    x.Id,
+                    x.ModelLabel,
+                    x.TechnicalPower,
+                    x.Effectiveness,
+                    x.Count,
+                    x.Amount,
+                    variantLanguages
+                        .Where(language => language.ProductParametrId == x.Id && language.IsActive)
+                        .Select(language => new ProductParametrLanguageDto(
+                            language.LanguageCode,
+                            language.Description,
+                            language.Features))
+                        .ToList()))
                 .ToList();
             var descriptionList = descriptions
                 .Select(d => new ProductDescriptionDto(
@@ -768,6 +921,7 @@ namespace Volt.Application.Services
                 product.InStock,
                 product.OutOfStockAt,
                 product.InHomePage,
+                product.UseCommonVariantContent,
                 product.Certificate,
                 productImageList,
                 productDatasheetList,

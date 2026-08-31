@@ -15,5 +15,9 @@ namespace Volt.Application.Dtos.ServiceManagement
         string Content2,
         string Content3,
         string Content4,
+        string DetailContentHtml,
+        string SeoTitle,
+        string SeoDescription,
+        string SeoKeywords,
         bool IsActive);
 }

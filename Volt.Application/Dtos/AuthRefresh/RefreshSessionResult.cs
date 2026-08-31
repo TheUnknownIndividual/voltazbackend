@@ -7,5 +7,6 @@ namespace Volt.Application.Dtos.AuthRefresh
         Role Role,
         string AccessToken,
         CustomerDto User,
-        string RefreshToken);
+        string RefreshToken,
+        bool IssuedFromConcurrentRotation = false);
 }
