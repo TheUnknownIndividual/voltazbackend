@@ -38,6 +38,9 @@ namespace Volt.API
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IMetaInboxService", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IMetaWhatsAppOnboardingService", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient.ProductAiImportProcessor", LogLevel.Warning);
+            // The Google Places request URL carries the API key as a query parameter;
+            // keep this client at warning level for the same reason as Telegram/Meta above.
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.IGoogleReviewsService", LogLevel.Warning);
 
             // This optional file is provisioned only on the production server
             // by the FTP deploy script. It keeps Telegram integration secrets
@@ -47,6 +50,7 @@ namespace Volt.API
                 .AddJsonFile("telegram.production.json", optional: true, reloadOnChange: false)
                 .AddJsonFile("meta-inbox.production.json", optional: true, reloadOnChange: false)
                 .AddJsonFile("openai.production.json", optional: true, reloadOnChange: false)
+                .AddJsonFile("googlereviews.production.json", optional: true, reloadOnChange: false)
                 .AddEnvironmentVariables();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -246,6 +250,12 @@ namespace Volt.API
             {
                 client.BaseAddress = new Uri("https://api.telegram.org/");
                 client.Timeout = TimeSpan.FromSeconds(5);
+            });
+            builder.Services.Configure<GoogleReviewsOptions>(builder.Configuration.GetSection("GoogleReviews"));
+            builder.Services.AddHttpClient<IGoogleReviewsService, GoogleReviewsService>(client =>
+            {
+                client.BaseAddress = new Uri("https://maps.googleapis.com/");
+                client.Timeout = TimeSpan.FromSeconds(8);
             });
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
             builder.Services.Configure<MetaInboxOptions>(builder.Configuration.GetSection("MetaInbox"));

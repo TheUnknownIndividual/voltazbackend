@@ -1,0 +1,6 @@
+{
+  "GoogleReviews": {
+    "ApiKey": "replace-with-google-places-api-key",
+    "PlaceId": "replace-with-google-place-id"
+  }
+}

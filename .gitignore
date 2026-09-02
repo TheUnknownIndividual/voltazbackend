@@ -367,6 +367,7 @@ FodyWeavers.xsd
 /Volt.API/appsettings.Development.json
 /Volt.API/meta-inbox.production.json
 /Volt.API/openai.production.json
+/Volt.API/googlereviews.production.json
 
 # Local credentials, OS metadata, and generated deployment packages
 .DS_Store
