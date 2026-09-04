@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Volt.Application.Configuration;
+using Volt.Application.Dtos;
 using Volt.Application.Dtos.MetaInbox;
 using Volt.Application.Interfaces;
 using Volt.API.Services;
@@ -22,6 +23,7 @@ namespace Volt.API.Controllers
     {
         private readonly IMetaInboxService _service;
         private readonly IMetaWhatsAppOnboardingService _whatsAppOnboarding;
+        private readonly IMetaInboxHistorySyncService _historySync;
         private readonly IAdminAccessService _adminAccess;
         private readonly MetaInboxOptions _options;
         private readonly MetaWebhookDiagnostics _webhookDiagnostics;
@@ -30,6 +32,7 @@ namespace Volt.API.Controllers
         public MetaInboxController(
             IMetaInboxService service,
             IMetaWhatsAppOnboardingService whatsAppOnboarding,
+            IMetaInboxHistorySyncService historySync,
             IAdminAccessService adminAccess,
             IOptions<MetaInboxOptions> options,
             MetaWebhookDiagnostics webhookDiagnostics,
@@ -37,6 +40,7 @@ namespace Volt.API.Controllers
         {
             _service = service;
             _whatsAppOnboarding = whatsAppOnboarding;
+            _historySync = historySync;
             _adminAccess = adminAccess;
             _options = options.Value;
             _webhookDiagnostics = webhookDiagnostics;
@@ -58,7 +62,7 @@ namespace Volt.API.Controllers
         [AllowAnonymous]
         [HttpPost("webhook")]
         [EnableRateLimiting("meta-webhook")]
-        [RequestSizeLimit(1_048_576)]
+        [RequestSizeLimit(8_388_608)]
         public async Task<IActionResult> ReceiveWebhook(CancellationToken ct)
         {
             var attemptId = _webhookDiagnostics.BeginAttempt();
@@ -99,13 +103,21 @@ namespace Volt.API.Controllers
         }
 
         [HttpGet("configuration")]
-        public IActionResult Configuration()
+        public async Task<IActionResult> Configuration(CancellationToken ct)
         {
+            var actorId = AdminId();
+            if (!actorId.HasValue) return Forbid();
+            var session = await _adminAccess.GetSessionAsync(actorId.Value, ct);
+            if (session is null) return Forbid();
+
             var commonReady = _options.Enabled && !string.IsNullOrWhiteSpace(_options.AppSecret) &&
                               !string.IsNullOrWhiteSpace(_options.VerifyToken);
             var messengerReady = commonReady && !string.IsNullOrWhiteSpace(_options.PageAccessToken);
             var whatsAppReady = commonReady && !string.IsNullOrWhiteSpace(_options.WhatsAppAccessToken) &&
                                 !string.IsNullOrWhiteSpace(_options.WhatsAppPhoneNumberId);
+            var canViewWebhookDiagnostics = session.IsSuperAdmin;
+            var canViewAllConversations = canViewWebhookDiagnostics ||
+                                          await _service.CanViewAllConversationsAsync(actorId.Value, ct);
             return Ok(new
             {
                 success = true,
@@ -115,7 +127,9 @@ namespace Volt.API.Controllers
                     _options.GraphApiVersion,
                     messengerReady,
                     whatsAppReady,
-                    _webhookDiagnostics.Snapshot())
+                    canViewAllConversations,
+                    canViewWebhookDiagnostics,
+                    canViewWebhookDiagnostics ? _webhookDiagnostics.Snapshot() : null)
             });
         }
 
@@ -124,6 +138,24 @@ namespace Volt.API.Controllers
         {
             if (!await CanManageWhatsAppOnboardingAsync(ct)) return Forbid();
             return Ok(new { success = true, data = await _whatsAppOnboarding.GetStatusAsync(ct), error = (object?)null });
+        }
+
+        [HttpGet("whatsapp-onboarding/history-sync")]
+        public async Task<IActionResult> WhatsAppHistorySyncStatus(CancellationToken ct)
+        {
+            if (!await CanManageWhatsAppOnboardingAsync(ct)) return Forbid();
+            var status = await _historySync.GetStatusAsync(_options.WhatsAppPhoneNumberId, ct);
+            if (status is null) return CreateErrorResult("WHATSAPP_HISTORY_NOT_CONFIGURED", "WhatsApp history synchronization is not configured.");
+            return Ok(new { success = true, data = status, error = (object?)null });
+        }
+
+        [HttpPost("whatsapp-onboarding/history-sync")]
+        [EnableRateLimiting("protected-write")]
+        public async Task<IActionResult> RequestWhatsAppHistorySync(CancellationToken ct)
+        {
+            var actorId = AdminId();
+            if (!actorId.HasValue || !await CanManageWhatsAppOnboardingAsync(ct)) return Forbid();
+            return CreateActionResult(await _historySync.RequestAsync(_options.WhatsAppPhoneNumberId, actorId.Value, ct));
         }
 
         [HttpPost("whatsapp-onboarding/complete")]
@@ -153,19 +185,31 @@ namespace Volt.API.Controllers
 
         [HttpGet("conversations/{conversationId:int}/messages")]
         public async Task<IActionResult> Messages(int conversationId, [FromQuery] long? afterId, CancellationToken ct)
-            => CreateActionResult(await _service.GetMessagesAsync(conversationId, afterId, ct));
+        {
+            var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
+            return CreateActionResult(await _service.GetMessagesAsync(conversationId, afterId, actorId.Value, ct));
+        }
 
         [HttpGet("conversations/{conversationId:int}/notes")]
         public async Task<IActionResult> Notes(int conversationId, [FromQuery] long? afterId, CancellationToken ct)
-            => CreateActionResult(await _service.GetNotesAsync(conversationId, afterId, ct));
+        {
+            var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
+            return CreateActionResult(await _service.GetNotesAsync(conversationId, afterId, actorId.Value, ct));
+        }
 
         [HttpGet("assignees")]
         public async Task<IActionResult> Assignees(CancellationToken ct)
-            => CreateActionResult(await _service.GetAssigneesAsync(ct));
+        {
+            var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
+            return CreateActionResult(await _service.GetAssigneesAsync(actorId.Value, ct));
+        }
 
         [HttpGet("unread-count")]
         public async Task<IActionResult> UnreadCount(CancellationToken ct)
-            => CreateActionResult(await _service.GetUnreadCountAsync(ct));
+        {
+            var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
+            return CreateActionResult(await _service.GetUnreadCountAsync(actorId.Value, ct));
+        }
 
         [HttpPut("conversations/{conversationId:int}/assignment")]
         [EnableRateLimiting("protected-write")]
@@ -185,7 +229,10 @@ namespace Volt.API.Controllers
 
         [HttpPut("conversations/{conversationId:int}/read")]
         public async Task<IActionResult> MarkRead(int conversationId, CancellationToken ct)
-            => CreateActionResult(await _service.MarkReadAsync(conversationId, ct));
+        {
+            var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
+            return CreateActionResult(await _service.MarkReadAsync(conversationId, actorId.Value, ct));
+        }
 
         [HttpPost("conversations/{conversationId:int}/messages")]
         [EnableRateLimiting("protected-write")]
@@ -193,6 +240,18 @@ namespace Volt.API.Controllers
         {
             var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
             return CreateActionResult(await _service.SendMessageAsync(conversationId, request.Text, actorId.Value, ct));
+        }
+
+        [HttpPost("conversations/{conversationId:int}/attachments")]
+        [EnableRateLimiting("protected-write")]
+        [RequestSizeLimit(15_728_640)]
+        public async Task<IActionResult> SendAttachment(int conversationId, IFormFile file, [FromForm] string? caption, CancellationToken ct)
+        {
+            var actorId = AdminId(); if (!actorId.HasValue) return Forbid();
+            if (file is null || file.Length == 0) return CreateErrorResult("VALIDATION_ERROR", "An image file is required.");
+            await using var stream = file.OpenReadStream();
+            var request = new FileUploadRequest { FileName = file.FileName, Content = stream };
+            return CreateActionResult(await _service.SendAttachmentAsync(conversationId, request, caption, actorId.Value, ct));
         }
 
         [HttpPost("conversations/{conversationId:int}/notes")]

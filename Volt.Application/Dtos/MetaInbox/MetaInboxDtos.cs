@@ -49,7 +49,9 @@ namespace Volt.Application.Dtos.MetaInbox
         string GraphApiVersion,
         bool MessengerReady,
         bool WhatsAppReady,
-        MetaInboxWebhookDiagnosticsDto Webhook);
+        bool CanViewAllConversations,
+        bool CanViewWebhookDiagnostics,
+        MetaInboxWebhookDiagnosticsDto? Webhook);
 
     public sealed record MetaInboxWebhookDiagnosticsDto(
         DateTime StartedAtUtc,
@@ -92,6 +94,9 @@ namespace Volt.Application.Dtos.MetaInbox
         string? AccountMode,
         bool AppSubscribed,
         bool WebhookMessagesSubscribed,
+        bool WebhookHistorySubscribed,
+        bool WebhookMessageEchoesSubscribed,
+        bool WebhookAppStateSyncSubscribed,
         string? LastError);
 
     public sealed record WhatsAppOnboardingCompleteRequest(

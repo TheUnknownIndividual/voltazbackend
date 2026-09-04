@@ -21,6 +21,7 @@ namespace Volt.API.Services
         private readonly MetaInboxOptions _options;
         private readonly MetaWhatsAppOnboardingSessionStore _sessions;
         private readonly IAdminAuditService _audit;
+        private readonly IMetaInboxHistorySyncService _historySync;
         private readonly ILogger<MetaWhatsAppOnboardingService> _logger;
 
         public MetaWhatsAppOnboardingService(
@@ -28,12 +29,14 @@ namespace Volt.API.Services
             IOptions<MetaInboxOptions> options,
             MetaWhatsAppOnboardingSessionStore sessions,
             IAdminAuditService audit,
+            IMetaInboxHistorySyncService historySync,
             ILogger<MetaWhatsAppOnboardingService> logger)
         {
             _client = client;
             _options = options.Value;
             _sessions = sessions;
             _audit = audit;
+            _historySync = historySync;
             _logger = logger;
         }
 
@@ -80,6 +83,8 @@ namespace Volt.API.Services
                 if (temporaryStatus.Connected)
                 {
                     var permanentStatus = await FetchStatusAsync(_options.WhatsAppAccessToken, ct);
+                    if (permanentStatus.Connected && permanentStatus.WebhookHistorySubscribed)
+                        await TryRequestHistorySyncAsync(actorAdminUserId, ct);
                     await WriteAuditSafelyAsync(actorAdminUserId, "WHATSAPP_ONBOARDING_COMPLETED", phoneNumberId, true, ct);
                     return ApiResponse<WhatsAppOnboardingResultDto>.SuccessResponse(
                         new WhatsAppOnboardingResultDto(permanentStatus.Connected, false, null, permanentStatus));
@@ -123,6 +128,8 @@ namespace Volt.API.Services
                 _sessions.Remove(continuationToken);
 
                 var permanentStatus = await FetchStatusAsync(_options.WhatsAppAccessToken, ct);
+                if (permanentStatus.Connected && permanentStatus.WebhookHistorySubscribed)
+                    await TryRequestHistorySyncAsync(actorAdminUserId, ct);
                 await WriteAuditSafelyAsync(actorAdminUserId, "WHATSAPP_PHONE_REGISTERED", session.PhoneNumberId, permanentStatus.Connected, ct);
                 return ApiResponse<WhatsAppOnboardingResultDto>.SuccessResponse(
                     new WhatsAppOnboardingResultDto(permanentStatus.Connected, false, null, permanentStatus));
@@ -186,7 +193,7 @@ namespace Volt.API.Services
                 ct);
 
             var appSubscribed = false;
-            var messagesSubscribed = false;
+            var webhookFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var statusWarnings = new List<string>();
             try { appSubscribed = await IsAppSubscribedAsync(accessToken, ct); }
             catch (MetaGraphException exception)
@@ -194,7 +201,7 @@ namespace Volt.API.Services
                 _logger.LogWarning("Could not verify the WABA app subscription with Meta HTTP {StatusCode}.", exception.StatusCode);
                 statusWarnings.Add("WABA app subscription could not be verified.");
             }
-            try { messagesSubscribed = await IsMessagesWebhookSubscribedAsync(ct); }
+            try { webhookFields = await GetWhatsAppWebhookFieldsAsync(ct); }
             catch (MetaGraphException exception)
             {
                 _logger.LogWarning("Could not verify the WhatsApp messages webhook subscription with Meta HTTP {StatusCode}.", exception.StatusCode);
@@ -221,7 +228,10 @@ namespace Volt.API.Services
                 platformType,
                 ReadString(phone, "account_mode"),
                 appSubscribed,
-                messagesSubscribed,
+                webhookFields.Contains("messages"),
+                webhookFields.Contains("history"),
+                webhookFields.Contains("smb_message_echoes"),
+                webhookFields.Contains("smb_app_state_sync"),
                 statusWarnings.Count == 0 ? null : string.Join(" ", statusWarnings));
         }
 
@@ -241,7 +251,7 @@ namespace Volt.API.Services
             });
         }
 
-        private async Task<bool> IsMessagesWebhookSubscribedAsync(CancellationToken ct)
+        private async Task<HashSet<string>> GetWhatsAppWebhookFieldsAsync(CancellationToken ct)
         {
             var appAccessToken = $"{_options.AppId}|{_options.AppSecret}";
             var root = await SendGraphAsync(HttpMethod.Get,
@@ -252,17 +262,19 @@ namespace Volt.API.Services
                 appAccessToken,
                 null,
                 ct);
-            if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return false;
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) return result;
             foreach (var subscription in data.EnumerateArray())
             {
                 if (!string.Equals(ReadString(subscription, "object"), "whatsapp_business_account", StringComparison.OrdinalIgnoreCase) ||
                     !subscription.TryGetProperty("fields", out var fields) || fields.ValueKind != JsonValueKind.Array) continue;
-                if (fields.EnumerateArray().Any(field =>
-                        field.ValueKind == JsonValueKind.String
-                            ? string.Equals(field.GetString(), "messages", StringComparison.OrdinalIgnoreCase)
-                            : string.Equals(ReadString(field, "name"), "messages", StringComparison.OrdinalIgnoreCase))) return true;
+                foreach (var field in fields.EnumerateArray())
+                {
+                    var name = field.ValueKind == JsonValueKind.String ? field.GetString() : ReadString(field, "name");
+                    if (!string.IsNullOrWhiteSpace(name)) result.Add(name);
+                }
             }
-            return false;
+            return result;
         }
 
         private async Task<JsonElement> SendGraphAsync(
@@ -299,7 +311,24 @@ namespace Volt.API.Services
             null, null, null, null, null, null, null,
             false,
             false,
+            false,
+            false,
+            false,
             error);
+
+        private async Task TryRequestHistorySyncAsync(int actorAdminUserId, CancellationToken ct)
+        {
+            try
+            {
+                var result = await _historySync.RequestAsync(_options.WhatsAppPhoneNumberId, actorAdminUserId, ct);
+                if (!result.Success)
+                    _logger.LogWarning("WhatsApp onboarding completed, but the one-time history synchronization request was not accepted: {Code}.", result.Error?.Code);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                _logger.LogWarning(exception, "WhatsApp onboarding completed, but history synchronization could not be started.");
+            }
+        }
 
         private bool IsConfigured() =>
             _options.Enabled &&

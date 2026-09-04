@@ -162,7 +162,12 @@ echo "Meta Inbox webhook configuration is ready."
 echo "Callback URL: $CALLBACK_URL"
 echo "Verify token: $VERIFY_TOKEN"
 echo "Subscribe the Page object to: messages, message_deliveries, message_reads"
-echo "Subscribe the WhatsApp Business Account object to: messages"
+echo "Subscribe the WhatsApp Business Account object to all Coexistence fields:"
+echo "  messages"
+echo "  history"
+echo "  smb_message_echoes"
+echo "  smb_app_state_sync"
+echo "The WABA app subscription and these webhook-field subscriptions are separate settings in Meta."
 if [ -z "$META_PAGE_ACCESS_TOKEN" ]; then
   echo "Page Access Token is still pending. Incoming webhooks can be configured now; rerun this installer after Meta issues the Page token to enable replies."
 fi

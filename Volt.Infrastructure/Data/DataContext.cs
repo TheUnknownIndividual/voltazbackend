@@ -20,6 +20,9 @@ namespace Volt.Infrastructure.Data
         public DbSet<MetaInboxConversation> MetaInboxConversations => Set<MetaInboxConversation>();
         public DbSet<MetaInboxMessage> MetaInboxMessages => Set<MetaInboxMessage>();
         public DbSet<MetaInboxInternalNote> MetaInboxInternalNotes => Set<MetaInboxInternalNote>();
+        public DbSet<MetaInboxHistorySync> MetaInboxHistorySyncs => Set<MetaInboxHistorySync>();
+        public DbSet<MetaWebhookQueueItem> MetaWebhookQueueItems => Set<MetaWebhookQueueItem>();
+        public DbSet<MetaInboxWhatsAppContact> MetaInboxWhatsAppContacts => Set<MetaInboxWhatsAppContact>();
         public DbSet<CustomerUser> CustomerUsers => Set<CustomerUser>();
         public DbSet<CustomerExternalLogin> CustomerExternalLogins => Set<CustomerExternalLogin>();
         public DbSet<CustomerPasskeyCredential> CustomerPasskeyCredentials => Set<CustomerPasskeyCredential>();

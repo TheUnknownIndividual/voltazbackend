@@ -151,7 +151,13 @@ try {
     Write-Host "Meta webhook configuration is ready." -ForegroundColor Green
     Write-Host "Callback URL: $CallbackUrl" -ForegroundColor Green
     Write-Host "Verify token: $verifyToken" -ForegroundColor Green
-    Write-Host "Paste those two values into the Meta App Dashboard, then subscribe to the messages field." -ForegroundColor Green
+    Write-Host "Paste those two values into the Meta App Dashboard." -ForegroundColor Green
+    Write-Host "For the WhatsApp Business Account object, subscribe all Coexistence fields:" -ForegroundColor Green
+    Write-Host "  messages" -ForegroundColor Green
+    Write-Host "  history" -ForegroundColor Green
+    Write-Host "  smb_message_echoes" -ForegroundColor Green
+    Write-Host "  smb_app_state_sync" -ForegroundColor Green
+    Write-Host "The WABA app subscription and webhook-field subscriptions are separate Meta settings." -ForegroundColor Yellow
 }
 finally {
     if (Test-Path -LiteralPath $temporaryFile) {

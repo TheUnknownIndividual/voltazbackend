@@ -70,4 +70,9 @@ else
   echo "Verify token: $VERIFY_TOKEN"
 fi
 echo "Client certificate: Off"
-echo "After Verify and Save, subscribe the WhatsApp webhook to: messages"
+echo "After Verify and Save, subscribe the WhatsApp Business Account object to:"
+echo "  messages"
+echo "  history"
+echo "  smb_message_echoes"
+echo "  smb_app_state_sync"
+echo "The WABA app subscription and these webhook-field subscriptions are separate Meta settings."

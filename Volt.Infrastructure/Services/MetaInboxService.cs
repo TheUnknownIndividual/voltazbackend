@@ -2,6 +2,8 @@
 
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -23,13 +25,23 @@ namespace Volt.Infrastructure.Services
         private readonly HttpClient _client;
         private readonly MetaInboxOptions _options;
         private readonly IAdminAuditService _audit;
+        private readonly IMetaInboxHistorySyncService _historySync;
+        private readonly IFileService _fileService;
 
-        public MetaInboxService(DataContext context, HttpClient client, IOptions<MetaInboxOptions> options, IAdminAuditService audit)
+        public MetaInboxService(
+            DataContext context,
+            HttpClient client,
+            IOptions<MetaInboxOptions> options,
+            IAdminAuditService audit,
+            IMetaInboxHistorySyncService historySync,
+            IFileService fileService)
         {
             _context = context;
             _client = client;
             _options = options.Value;
             _audit = audit;
+            _historySync = historySync;
+            _fileService = fileService;
         }
 
         public async Task<MetaInboxWebhookProcessingResult> ProcessWebhookAsync(string payload, CancellationToken ct = default)
@@ -192,6 +204,20 @@ namespace Volt.Infrastructure.Services
                             phoneNumberId ??= ReadString(metadata, "phone_number_id");
                         if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
                             foreach (var _ in messages.EnumerateArray()) messageCount++;
+                        if (value.TryGetProperty("message_echoes", out var echoes) && echoes.ValueKind == JsonValueKind.Array)
+                            foreach (var _ in echoes.EnumerateArray()) messageCount++;
+                        if (value.TryGetProperty("history", out var history) && history.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var historyItem in history.EnumerateArray())
+                            {
+                                if (!historyItem.TryGetProperty("threads", out var threads) || threads.ValueKind != JsonValueKind.Array) continue;
+                                foreach (var thread in threads.EnumerateArray())
+                                {
+                                    if (!thread.TryGetProperty("messages", out var historicalMessages) || historicalMessages.ValueKind != JsonValueKind.Array) continue;
+                                    foreach (var _ in historicalMessages.EnumerateArray()) messageCount++;
+                                }
+                            }
+                        }
                         if (value.TryGetProperty("statuses", out var statuses) && statuses.ValueKind == JsonValueKind.Array)
                             foreach (var _ in statuses.EnumerateArray()) statusCount++;
                     }
@@ -222,7 +248,8 @@ namespace Volt.Infrastructure.Services
 
                 foreach (var change in changes.EnumerateArray())
                 {
-                    if (ReadString(change, "field") != "messages" ||
+                    var field = ReadString(change, "field");
+                    if (string.IsNullOrWhiteSpace(field) ||
                         !change.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.Object)
                         continue;
 
@@ -234,19 +261,139 @@ namespace Volt.Infrastructure.Services
                          !string.Equals(phoneNumberId, _options.WhatsAppPhoneNumberId, StringComparison.Ordinal)))
                         continue;
 
-                    var contactNames = ReadWhatsAppContactNames(value);
-                    if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
+                    if (field == "messages")
                     {
-                        foreach (var incoming in messages.EnumerateArray())
-                            await StoreWhatsAppMessageAsync(phoneNumberId, incoming, contactNames, ct);
-                    }
+                        var contactNames = ReadWhatsAppContactNames(value);
+                        if (value.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var incoming in messages.EnumerateArray())
+                                await StoreWhatsAppMessageAsync(phoneNumberId, incoming, contactNames, ct);
+                        }
 
-                    if (value.TryGetProperty("statuses", out var statuses) && statuses.ValueKind == JsonValueKind.Array)
+                        if (value.TryGetProperty("statuses", out var statuses) && statuses.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var status in statuses.EnumerateArray())
+                                await ApplyWhatsAppStatusAsync(phoneNumberId, status, ct);
+                        }
+                    }
+                    else if (field == "history")
                     {
-                        foreach (var status in statuses.EnumerateArray())
-                            await ApplyWhatsAppStatusAsync(phoneNumberId, status, ct);
+                        await ProcessWhatsAppHistoryAsync(phoneNumberId, value, ct);
+                    }
+                    else if (field == "smb_message_echoes")
+                    {
+                        await ProcessWhatsAppMessageEchoesAsync(phoneNumberId, value, ct);
+                    }
+                    else if (field == "smb_app_state_sync")
+                    {
+                        await ProcessWhatsAppContactStateSyncAsync(phoneNumberId, value, ct);
                     }
                 }
+            }
+        }
+
+        private async Task ProcessWhatsAppHistoryAsync(string phoneNumberId, JsonElement value, CancellationToken ct)
+        {
+            if (!value.TryGetProperty("history", out var historyItems) || historyItems.ValueKind != JsonValueKind.Array)
+                return;
+
+            foreach (var historyItem in historyItems.EnumerateArray())
+            {
+                if (historyItem.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array)
+                {
+                    var firstError = errors.EnumerateArray().FirstOrDefault();
+                    var code = ReadInt(firstError, "code")?.ToString() ?? "META_HISTORY_SYNC_FAILED";
+                    var declined = code == "2593109";
+                    await _historySync.RecordFailureAsync(new MetaInboxHistorySyncFailureUpdate(
+                        phoneNumberId,
+                        declined ? MetaInboxHistorySyncStatuses.Declined : MetaInboxHistorySyncStatuses.Failed,
+                        code,
+                        declined
+                            ? "Chat history sharing was declined in the WhatsApp Business app."
+                            : "Meta reported that chat history synchronization failed.",
+                        DateTime.UtcNow), ct);
+                    continue;
+                }
+
+                var phase = historyItem.TryGetProperty("metadata", out var historyMetadata)
+                    ? ReadInt(historyMetadata, "phase")
+                    : null;
+                var chunkOrder = historyItem.TryGetProperty("metadata", out historyMetadata)
+                    ? ReadInt(historyMetadata, "chunk_order")
+                    : null;
+                var progress = historyItem.TryGetProperty("metadata", out historyMetadata)
+                    ? ReadInt(historyMetadata, "progress") ?? 0
+                    : 0;
+
+                if (historyItem.TryGetProperty("threads", out var threads) && threads.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var thread in threads.EnumerateArray())
+                        await StoreWhatsAppHistoryThreadAsync(phoneNumberId, thread, ct);
+                }
+
+                await _historySync.RecordProgressAsync(new MetaInboxHistorySyncProgressUpdate(
+                    phoneNumberId,
+                    Math.Clamp(progress, 0, 100),
+                    phase,
+                    chunkOrder,
+                    DateTime.UtcNow), ct);
+            }
+        }
+
+        private async Task ProcessWhatsAppMessageEchoesAsync(string phoneNumberId, JsonElement value, CancellationToken ct)
+        {
+            if (!value.TryGetProperty("message_echoes", out var echoes) || echoes.ValueKind != JsonValueKind.Array)
+                return;
+
+            foreach (var echo in echoes.EnumerateArray())
+            {
+                var participantId = NormalizeWhatsAppParticipant(ReadString(echo, "to") ?? ReadString(echo, "recipient_id"));
+                if (string.IsNullOrWhiteSpace(participantId)) continue;
+                await StoreWhatsAppMessageAsync(
+                    phoneNumberId,
+                    echo,
+                    new Dictionary<string, string>(),
+                    ct,
+                    MetaInboxMessageDirection.Outgoing,
+                    participantId);
+            }
+        }
+
+        private async Task ProcessWhatsAppContactStateSyncAsync(string phoneNumberId, JsonElement value, CancellationToken ct)
+        {
+            if (!value.TryGetProperty("state_sync", out var stateItems) || stateItems.ValueKind != JsonValueKind.Array)
+                return;
+
+            var names = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var stateItem in stateItems.EnumerateArray())
+            {
+                if (!string.Equals(ReadString(stateItem, "type"), "contact", StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(ReadString(stateItem, "action"), "add", StringComparison.OrdinalIgnoreCase) ||
+                    !stateItem.TryGetProperty("contact", out var contact) || contact.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                var participantId = NormalizeWhatsAppParticipant(ReadString(contact, "phone_number"));
+                var displayName = ReadString(contact, "full_name") ?? ReadString(contact, "first_name");
+                if (string.IsNullOrWhiteSpace(participantId) || string.IsNullOrWhiteSpace(displayName)) continue;
+                names[participantId] = Trim(displayName, 200);
+            }
+
+            var participantIds = names.Keys.ToList();
+            for (var offset = 0; offset < participantIds.Count; offset += 500)
+            {
+                var batch = participantIds.Skip(offset).Take(500).ToList();
+                var conversations = await _context.MetaInboxConversations
+                    .Where(x => x.Channel == MetaInboxChannel.WhatsApp &&
+                                x.AccountExternalId == phoneNumberId &&
+                                batch.Contains(x.ParticipantExternalId))
+                    .ToListAsync(ct);
+                var now = DateTime.UtcNow;
+                foreach (var conversation in conversations)
+                {
+                    conversation.ParticipantDisplayName = names[conversation.ParticipantExternalId];
+                    conversation.UpdatedAt = now;
+                }
+                if (conversations.Count > 0) await _context.SaveChangesAsync(ct);
             }
         }
 
@@ -254,15 +401,17 @@ namespace Volt.Infrastructure.Services
             string phoneNumberId,
             JsonElement incoming,
             IReadOnlyDictionary<string, string> contactNames,
-            CancellationToken ct)
+            CancellationToken ct,
+            MetaInboxMessageDirection direction = MetaInboxMessageDirection.Incoming,
+            string? participantIdOverride = null)
         {
-            var participantId = ReadString(incoming, "from");
+            var participantId = participantIdOverride ?? ReadString(incoming, "from");
             if (string.IsNullOrWhiteSpace(participantId)) return;
 
             var externalMessageId = ReadString(incoming, "id");
             var messageType = ReadString(incoming, "type") ?? "message";
             var text = ReadWhatsAppText(incoming, messageType);
-            var attachments = ReadWhatsAppAttachments(incoming, messageType);
+            var attachments = await ReadWhatsAppAttachmentsAsync(incoming, messageType, ct);
             var occurredAt = ReadWhatsAppTimestamp(incoming);
             contactNames.TryGetValue(participantId, out var contactName);
 
@@ -310,15 +459,18 @@ namespace Volt.Infrastructure.Services
             {
                 ConversationId = conversation.Id,
                 ExternalMessageId = externalMessageId,
-                Direction = MetaInboxMessageDirection.Incoming,
+                Direction = direction,
                 Text = TrimOrNull(text, 4000),
                 AttachmentsJson = JsonSerializer.Serialize(attachments),
-                DeliveryStatus = "received",
+                DeliveryStatus = direction == MetaInboxMessageDirection.Incoming ? "received" : "sent",
                 CreatedAt = occurredAt
             };
             _context.MetaInboxMessages.Add(message);
-            conversation.UnreadCount++;
-            conversation.Status = "open";
+            if (direction == MetaInboxMessageDirection.Incoming)
+            {
+                conversation.UnreadCount++;
+                conversation.Status = "open";
+            }
             if (occurredAt >= conversation.LastMessageAt)
             {
                 conversation.LastMessageAt = occurredAt;
@@ -333,6 +485,129 @@ namespace Volt.Infrastructure.Services
             catch (DbUpdateException exception) when (IsUniqueViolation(exception))
             {
                 _context.Entry(message).State = EntityState.Detached;
+                await _context.Entry(conversation).ReloadAsync(ct);
+            }
+        }
+
+        private async Task StoreWhatsAppHistoryThreadAsync(string phoneNumberId, JsonElement thread, CancellationToken ct)
+        {
+            var participantId = NormalizeWhatsAppParticipant(ReadString(thread, "id"));
+            if (string.IsNullOrWhiteSpace(participantId) ||
+                !thread.TryGetProperty("messages", out var messagesElement) || messagesElement.ValueKind != JsonValueKind.Array)
+                return;
+
+            var drafts = new List<HistoryMessageDraft>();
+            foreach (var historyMessage in messagesElement.EnumerateArray())
+            {
+                var from = NormalizeWhatsAppParticipant(ReadString(historyMessage, "from"));
+                var direction = string.Equals(from, participantId, StringComparison.Ordinal)
+                    ? MetaInboxMessageDirection.Incoming
+                    : MetaInboxMessageDirection.Outgoing;
+                var messageType = ReadString(historyMessage, "type") ?? "message";
+                var text = ReadWhatsAppText(historyMessage, messageType);
+                var attachments = await ReadWhatsAppAttachmentsAsync(historyMessage, messageType, ct);
+                var occurredAt = ReadWhatsAppTimestamp(historyMessage);
+                var externalMessageId = ReadString(historyMessage, "id");
+                if (string.IsNullOrWhiteSpace(externalMessageId))
+                    externalMessageId = BuildHistoryFingerprint(phoneNumberId, participantId, from, occurredAt, messageType, text, attachments);
+                var historyStatus = historyMessage.TryGetProperty("history_context", out var historyContext)
+                    ? ReadString(historyContext, "status")
+                    : null;
+                drafts.Add(new HistoryMessageDraft(
+                    Trim(externalMessageId, 256),
+                    direction,
+                    TrimOrNull(text, 4000),
+                    attachments,
+                    NormalizeHistoryDeliveryStatus(historyStatus, direction),
+                    occurredAt));
+            }
+
+            drafts = drafts
+                .GroupBy(x => x.ExternalMessageId, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(x => x.OccurredAt)
+                .ToList();
+            if (drafts.Count == 0) return;
+
+            var conversation = await _context.MetaInboxConversations.FirstOrDefaultAsync(
+                x => x.Channel == MetaInboxChannel.WhatsApp && x.AccountExternalId == phoneNumberId &&
+                     x.ParticipantExternalId == participantId, ct);
+            if (conversation is null)
+            {
+                var first = drafts[0];
+                var last = drafts[^1];
+                conversation = new MetaInboxConversation
+                {
+                    Channel = MetaInboxChannel.WhatsApp,
+                    AccountExternalId = phoneNumberId,
+                    ParticipantExternalId = participantId,
+                    ParticipantDisplayName = participantId,
+                    Status = "open",
+                    UnreadCount = 0,
+                    LastMessagePreview = BuildPreview(last.Text, last.Attachments),
+                    LastMessageAt = last.OccurredAt,
+                    CreatedAt = first.OccurredAt,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                _context.MetaInboxConversations.Add(conversation);
+                try
+                {
+                    await _context.SaveChangesAsync(ct);
+                }
+                catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+                {
+                    _context.Entry(conversation).State = EntityState.Detached;
+                    conversation = await _context.MetaInboxConversations.FirstAsync(
+                        x => x.Channel == MetaInboxChannel.WhatsApp && x.AccountExternalId == phoneNumberId &&
+                             x.ParticipantExternalId == participantId, ct);
+                }
+            }
+
+            var candidateIds = drafts.Select(x => x.ExternalMessageId).ToList();
+            var existingIds = new HashSet<string>(StringComparer.Ordinal);
+            for (var offset = 0; offset < candidateIds.Count; offset += 500)
+            {
+                var batch = candidateIds.Skip(offset).Take(500).ToList();
+                var found = await _context.MetaInboxMessages.AsNoTracking()
+                    .Where(x => x.ConversationId == conversation.Id &&
+                                x.ExternalMessageId != null && batch.Contains(x.ExternalMessageId))
+                    .Select(x => x.ExternalMessageId!)
+                    .ToListAsync(ct);
+                existingIds.UnionWith(found);
+            }
+
+            foreach (var draft in drafts.Where(x => !existingIds.Contains(x.ExternalMessageId)))
+            {
+                _context.MetaInboxMessages.Add(new MetaInboxMessage
+                {
+                    ConversationId = conversation.Id,
+                    ExternalMessageId = draft.ExternalMessageId,
+                    Direction = draft.Direction,
+                    Text = draft.Text,
+                    AttachmentsJson = JsonSerializer.Serialize(draft.Attachments),
+                    DeliveryStatus = draft.DeliveryStatus,
+                    IsHistorical = true,
+                    CreatedAt = draft.OccurredAt
+                });
+            }
+
+            var latest = drafts[^1];
+            if (latest.OccurredAt > conversation.LastMessageAt)
+            {
+                conversation.LastMessageAt = latest.OccurredAt;
+                conversation.LastMessagePreview = BuildPreview(latest.Text, latest.Attachments);
+            }
+            conversation.UpdatedAt = DateTime.UtcNow;
+
+            try
+            {
+                await _context.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+            {
+                foreach (var entry in _context.ChangeTracker.Entries<MetaInboxMessage>()
+                             .Where(x => x.State == EntityState.Added && x.Entity.ConversationId == conversation.Id))
+                    entry.State = EntityState.Detached;
                 await _context.Entry(conversation).ReloadAsync(ct);
             }
         }
@@ -409,9 +684,15 @@ namespace Volt.Infrastructure.Services
                 .ExecuteUpdateAsync(updates => updates.SetProperty(x => x.DeliveryStatus, "read"), ct);
         }
 
+        public async Task<bool> CanViewAllConversationsAsync(int actorAdminUserId, CancellationToken ct = default)
+            => (await GetConversationAccessAsync(actorAdminUserId, ct)).CanViewAll;
+
         public async Task<ApiResponse<MetaInboxConversationPageDto>> GetConversationsAsync(string? search, string? status, string? assignment, int actorAdminUserId, int page, int pageSize, CancellationToken ct = default)
         {
-            var query = _context.MetaInboxConversations.AsNoTracking().Include(x => x.AssignedAdminUser).AsQueryable();
+            var access = await GetConversationAccessAsync(actorAdminUserId, ct);
+            IQueryable<MetaInboxConversation> query = _context.MetaInboxConversations.AsNoTracking()
+                .Include(x => x.AssignedAdminUser);
+            query = ApplyConversationAccess(query, actorAdminUserId, access);
             var normalizedStatus = NormalizeStatus(status, allowAll: true);
             if (normalizedStatus is not null) query = query.Where(x => x.Status == normalizedStatus);
             if (!string.IsNullOrWhiteSpace(search))
@@ -435,9 +716,9 @@ namespace Volt.Infrastructure.Services
                 new MetaInboxConversationPageDto(records.Select(MapConversation).ToList(), total, unreadTotal, page, pageSize));
         }
 
-        public async Task<ApiResponse<IReadOnlyList<MetaInboxMessageDto>>> GetMessagesAsync(int conversationId, long? afterId, CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<MetaInboxMessageDto>>> GetMessagesAsync(int conversationId, long? afterId, int actorAdminUserId, CancellationToken ct = default)
         {
-            if (!await _context.MetaInboxConversations.AsNoTracking().AnyAsync(x => x.Id == conversationId, ct))
+            if (!await CanAccessConversationAsync(conversationId, actorAdminUserId, ct))
                 return NotFound<IReadOnlyList<MetaInboxMessageDto>>();
             var query = _context.MetaInboxMessages.AsNoTracking().Include(x => x.SentByAdminUser)
                 .Where(x => x.ConversationId == conversationId);
@@ -452,9 +733,9 @@ namespace Volt.Infrastructure.Services
             return ApiResponse<IReadOnlyList<MetaInboxMessageDto>>.SuccessResponse(messages.Select(MapMessage).ToList());
         }
 
-        public async Task<ApiResponse<IReadOnlyList<MetaInboxInternalNoteDto>>> GetNotesAsync(int conversationId, long? afterId, CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<MetaInboxInternalNoteDto>>> GetNotesAsync(int conversationId, long? afterId, int actorAdminUserId, CancellationToken ct = default)
         {
-            if (!await _context.MetaInboxConversations.AsNoTracking().AnyAsync(x => x.Id == conversationId, ct))
+            if (!await CanAccessConversationAsync(conversationId, actorAdminUserId, ct))
                 return NotFound<IReadOnlyList<MetaInboxInternalNoteDto>>();
             var query = _context.MetaInboxInternalNotes.AsNoTracking().Include(x => x.AuthorAdminUser)
                 .Where(x => x.ConversationId == conversationId);
@@ -469,8 +750,13 @@ namespace Volt.Infrastructure.Services
             return ApiResponse<IReadOnlyList<MetaInboxInternalNoteDto>>.SuccessResponse(notes.Select(MapNote).ToList());
         }
 
-        public async Task<ApiResponse<IReadOnlyList<MetaInboxAssigneeDto>>> GetAssigneesAsync(CancellationToken ct = default)
+        public async Task<ApiResponse<IReadOnlyList<MetaInboxAssigneeDto>>> GetAssigneesAsync(int actorAdminUserId, CancellationToken ct = default)
         {
+            if (!(await GetConversationAccessAsync(actorAdminUserId, ct)).Exists)
+                return ApiResponse<IReadOnlyList<MetaInboxAssigneeDto>>.ErrorResponse(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Admin session was not found.");
+
             var admins = await _context.AdminUsers.AsNoTracking()
                 .Where(x => x.IsActive && (x.IsSuperAdmin || x.Username == "admin" || x.PagePermissions.Any(p => p.Page == AdminPage.MessageInbox)))
                 .OrderBy(x => x.DisplayName).ThenBy(x => x.Username).ToListAsync(ct);
@@ -478,12 +764,19 @@ namespace Volt.Infrastructure.Services
                 .Select(x => new MetaInboxAssigneeDto(x.Id, string.IsNullOrWhiteSpace(x.DisplayName) ? x.Username : x.DisplayName)).ToList());
         }
 
-        public async Task<ApiResponse<int>> GetUnreadCountAsync(CancellationToken ct = default)
-            => ApiResponse<int>.SuccessResponse(await _context.MetaInboxConversations.AsNoTracking().SumAsync(x => (int?)x.UnreadCount, ct) ?? 0);
+        public async Task<ApiResponse<int>> GetUnreadCountAsync(int actorAdminUserId, CancellationToken ct = default)
+        {
+            var access = await GetConversationAccessAsync(actorAdminUserId, ct);
+            var query = ApplyConversationAccess(
+                _context.MetaInboxConversations.AsNoTracking(),
+                actorAdminUserId,
+                access);
+            return ApiResponse<int>.SuccessResponse(await query.SumAsync(x => (int?)x.UnreadCount, ct) ?? 0);
+        }
 
         public async Task<ApiResponse<MetaInboxConversationDto>> AssignAsync(int conversationId, int? assignedAdminUserId, int actorAdminUserId, CancellationToken ct = default)
         {
-            var conversation = await FindConversationAsync(conversationId, ct);
+            var conversation = await FindConversationAsync(conversationId, actorAdminUserId, ct);
             if (conversation is null) return NotFound<MetaInboxConversationDto>();
             AdminUser? assignee = null;
             if (assignedAdminUserId.HasValue)
@@ -505,7 +798,7 @@ namespace Volt.Infrastructure.Services
             var normalizedStatus = NormalizeStatus(status, allowAll: false);
             if (normalizedStatus is null)
                 return ApiResponse<MetaInboxConversationDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Status must be open or closed.");
-            var conversation = await FindConversationAsync(conversationId, ct);
+            var conversation = await FindConversationAsync(conversationId, actorAdminUserId, ct);
             if (conversation is null) return NotFound<MetaInboxConversationDto>();
             conversation.Status = normalizedStatus;
             conversation.UpdatedAt = DateTime.UtcNow;
@@ -514,9 +807,9 @@ namespace Volt.Infrastructure.Services
             return ApiResponse<MetaInboxConversationDto>.SuccessResponse(MapConversation(conversation));
         }
 
-        public async Task<ApiResponse<MetaInboxConversationDto>> MarkReadAsync(int conversationId, CancellationToken ct = default)
+        public async Task<ApiResponse<MetaInboxConversationDto>> MarkReadAsync(int conversationId, int actorAdminUserId, CancellationToken ct = default)
         {
-            var conversation = await FindConversationAsync(conversationId, ct);
+            var conversation = await FindConversationAsync(conversationId, actorAdminUserId, ct);
             if (conversation is null) return NotFound<MetaInboxConversationDto>();
             if (conversation.UnreadCount > 0)
             {
@@ -533,7 +826,7 @@ namespace Volt.Infrastructure.Services
             if (normalizedText.Length is < 1 or > 2000)
                 return ApiResponse<MetaInboxMessageDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Message text must contain between 1 and 2000 characters.");
 
-            var conversation = await FindConversationAsync(conversationId, ct);
+            var conversation = await FindConversationAsync(conversationId, actorAdminUserId, ct);
             if (conversation is null) return NotFound<MetaInboxMessageDto>();
             if (!IsReadyForChannel(conversation.Channel))
                 return ApiResponse<MetaInboxMessageDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, $"{ChannelName(conversation.Channel)} is not configured on the server.");
@@ -631,12 +924,125 @@ namespace Volt.Infrastructure.Services
             return ApiResponse<MetaInboxMessageDto>.SuccessResponse(MapMessage(message));
         }
 
+        public async Task<ApiResponse<MetaInboxMessageDto>> SendAttachmentAsync(int conversationId, FileUploadRequest file, string? caption, int actorAdminUserId, CancellationToken ct = default)
+        {
+            var normalizedCaption = string.IsNullOrWhiteSpace(caption) ? null : caption.Trim();
+            if (normalizedCaption is { Length: > 2000 })
+                return ApiResponse<MetaInboxMessageDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Caption must be 2000 characters or fewer.");
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+                return ApiResponse<MetaInboxMessageDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Only JPG, PNG, or WEBP images can be sent.");
+
+            var conversation = await FindConversationAsync(conversationId, actorAdminUserId, ct);
+            if (conversation is null) return NotFound<MetaInboxMessageDto>();
+            if (!IsReadyForChannel(conversation.Channel))
+                return ApiResponse<MetaInboxMessageDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, $"{ChannelName(conversation.Channel)} is not configured on the server.");
+
+            if (conversation.Channel == MetaInboxChannel.WhatsApp)
+            {
+                if (!string.Equals(conversation.AccountExternalId, _options.WhatsAppPhoneNumberId, StringComparison.Ordinal))
+                    return ApiResponse<MetaInboxMessageDto>.ErrorResponse(
+                        ErrorCode.VALIDATION_ERROR,
+                        "This conversation belongs to a different WhatsApp phone number and cannot be sent with the configured account.");
+
+                var lastIncomingAt = await _context.MetaInboxMessages.AsNoTracking()
+                    .Where(x => x.ConversationId == conversationId && x.Direction == MetaInboxMessageDirection.Incoming)
+                    .MaxAsync(x => (DateTime?)x.CreatedAt, ct);
+                if (!lastIncomingAt.HasValue || lastIncomingAt.Value < DateTime.UtcNow.AddHours(-24))
+                    return ApiResponse<MetaInboxMessageDto>.ErrorResponse(
+                        "WHATSAPP_WINDOW_CLOSED",
+                        "WhatsApp's 24-hour customer service window is closed. Send an approved template before sending a free-form reply.");
+            }
+
+            string uploadedUrl;
+            try { uploadedUrl = await _fileService.UploadImageAsync(file, "meta-inbox", ct); }
+            catch (Exception) { return ApiResponse<MetaInboxMessageDto>.ErrorResponse("UPLOAD_FAILED", "The image could not be uploaded."); }
+
+            var endpoint = $"{NormalizeVersion()}/{Uri.EscapeDataString(conversation.AccountExternalId)}/messages";
+            var content = conversation.Channel switch
+            {
+                MetaInboxChannel.Instagram => JsonContent.Create(new
+                {
+                    recipient = new { id = conversation.ParticipantExternalId },
+                    message = new { attachment = new { type = "image", payload = new { url = uploadedUrl, is_reusable = true } } }
+                }),
+                MetaInboxChannel.WhatsApp => JsonContent.Create(new
+                {
+                    messaging_product = "whatsapp",
+                    recipient_type = "individual",
+                    to = conversation.ParticipantExternalId,
+                    type = "image",
+                    image = new { link = uploadedUrl, caption = normalizedCaption }
+                }),
+                _ => JsonContent.Create(new
+                {
+                    recipient = new { id = conversation.ParticipantExternalId },
+                    messaging_type = "RESPONSE",
+                    message = new { attachment = new { type = "image", payload = new { url = uploadedUrl, is_reusable = true } } }
+                })
+            };
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = content };
+            request.Headers.Authorization = new AuthenticationHeaderValue(
+                "Bearer",
+                conversation.Channel == MetaInboxChannel.WhatsApp ? _options.WhatsAppAccessToken : _options.PageAccessToken);
+            using var response = await _client.SendAsync(request, ct);
+            var responseBody = await response.Content.ReadAsStringAsync(ct);
+            if (!response.IsSuccessStatusCode)
+                return ApiResponse<MetaInboxMessageDto>.ErrorResponse("META_SEND_FAILED", $"Meta rejected the message with HTTP {(int)response.StatusCode}.");
+
+            string? externalMessageId = null;
+            try
+            {
+                using var responseDocument = JsonDocument.Parse(responseBody);
+                var responseRoot = responseDocument.RootElement;
+                externalMessageId = ReadString(responseRoot, "message_id");
+                if (string.IsNullOrWhiteSpace(externalMessageId) &&
+                    responseRoot.TryGetProperty("messages", out var sentMessages) && sentMessages.ValueKind == JsonValueKind.Array)
+                    externalMessageId = sentMessages.EnumerateArray().Select(x => ReadString(x, "id")).FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+            }
+            catch (JsonException) { }
+
+            var attachments = new List<StoredAttachment> { new("image", uploadedUrl, normalizedCaption) };
+            if (!string.IsNullOrWhiteSpace(externalMessageId))
+            {
+                var existingMessage = await _context.MetaInboxMessages.Include(x => x.SentByAdminUser)
+                    .FirstOrDefaultAsync(x => x.ConversationId == conversationId && x.ExternalMessageId == externalMessageId, ct);
+                if (existingMessage is not null)
+                {
+                    existingMessage.SentByAdminUserId ??= actorAdminUserId;
+                    await _context.SaveChangesAsync(ct);
+                    return ApiResponse<MetaInboxMessageDto>.SuccessResponse(MapMessage(existingMessage));
+                }
+            }
+
+            var message = new MetaInboxMessage
+            {
+                ConversationId = conversation.Id,
+                ExternalMessageId = externalMessageId,
+                Direction = MetaInboxMessageDirection.Outgoing,
+                Text = normalizedCaption,
+                AttachmentsJson = JsonSerializer.Serialize(attachments),
+                SentByAdminUserId = actorAdminUserId,
+                DeliveryStatus = "sent",
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.MetaInboxMessages.Add(message);
+            conversation.LastMessageAt = message.CreatedAt;
+            conversation.LastMessagePreview = BuildPreview(normalizedCaption, attachments);
+            conversation.UpdatedAt = message.CreatedAt;
+            await _context.SaveChangesAsync(ct);
+            message.SentByAdminUser = await _context.AdminUsers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == actorAdminUserId, ct);
+            await WriteAuditSafelyAsync(actorAdminUserId, "META_INBOX_ATTACHMENT_SENT", conversationId, null, ct);
+            return ApiResponse<MetaInboxMessageDto>.SuccessResponse(MapMessage(message));
+        }
+
         public async Task<ApiResponse<MetaInboxInternalNoteDto>> AddNoteAsync(int conversationId, string body, int actorAdminUserId, CancellationToken ct = default)
         {
             var normalizedBody = (body ?? string.Empty).Trim();
             if (normalizedBody.Length is < 1 or > 2000)
                 return ApiResponse<MetaInboxInternalNoteDto>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Internal note must contain between 1 and 2000 characters.");
-            if (!await _context.MetaInboxConversations.AnyAsync(x => x.Id == conversationId, ct))
+            if (!await CanAccessConversationAsync(conversationId, actorAdminUserId, ct))
                 return NotFound<MetaInboxInternalNoteDto>();
             var note = new MetaInboxInternalNote
             {
@@ -652,8 +1058,47 @@ namespace Volt.Infrastructure.Services
             return ApiResponse<MetaInboxInternalNoteDto>.SuccessResponse(MapNote(note));
         }
 
-        private async Task<MetaInboxConversation?> FindConversationAsync(int id, CancellationToken ct)
-            => await _context.MetaInboxConversations.Include(x => x.AssignedAdminUser).FirstOrDefaultAsync(x => x.Id == id, ct);
+        private async Task<MetaInboxConversation?> FindConversationAsync(int id, int actorAdminUserId, CancellationToken ct)
+        {
+            var access = await GetConversationAccessAsync(actorAdminUserId, ct);
+            IQueryable<MetaInboxConversation> query = _context.MetaInboxConversations.Include(x => x.AssignedAdminUser);
+            query = ApplyConversationAccess(query, actorAdminUserId, access);
+            return await query.FirstOrDefaultAsync(x => x.Id == id, ct);
+        }
+
+        private async Task<bool> CanAccessConversationAsync(int conversationId, int actorAdminUserId, CancellationToken ct)
+        {
+            var access = await GetConversationAccessAsync(actorAdminUserId, ct);
+            var query = ApplyConversationAccess(
+                _context.MetaInboxConversations.AsNoTracking(),
+                actorAdminUserId,
+                access);
+            return await query.AnyAsync(x => x.Id == conversationId, ct);
+        }
+
+        private async Task<ConversationAccess> GetConversationAccessAsync(int actorAdminUserId, CancellationToken ct)
+        {
+            var actor = await _context.AdminUsers.AsNoTracking()
+                .Where(x => x.Id == actorAdminUserId && x.IsActive)
+                .Select(x => new { x.Username, x.IsSuperAdmin, x.IsStakeholder })
+                .FirstOrDefaultAsync(ct);
+            if (actor is null) return new ConversationAccess(false, false);
+
+            var canViewAll = actor.IsSuperAdmin ||
+                             actor.IsStakeholder ||
+                             AdminUser.IsPrimaryUsername(actor.Username);
+            return new ConversationAccess(true, canViewAll);
+        }
+
+        private static IQueryable<MetaInboxConversation> ApplyConversationAccess(
+            IQueryable<MetaInboxConversation> query,
+            int actorAdminUserId,
+            ConversationAccess access)
+        {
+            if (!access.Exists) return query.Where(_ => false);
+            if (access.CanViewAll) return query;
+            return query.Where(x => x.AssignedAdminUserId == null || x.AssignedAdminUserId == actorAdminUserId);
+        }
 
         private async Task TryPopulateProfileAsync(MetaInboxConversation conversation, CancellationToken ct)
         {
@@ -785,15 +1230,64 @@ namespace Volt.Infrastructure.Services
             };
         }
 
-        private static List<StoredAttachment> ReadWhatsAppAttachments(JsonElement message, string messageType)
+        private async Task<List<StoredAttachment>> ReadWhatsAppAttachmentsAsync(JsonElement message, string messageType, CancellationToken ct)
         {
+            if (messageType == "media_placeholder")
+                return new List<StoredAttachment> { new("media", null, "Historical media") };
             if (messageType is not ("image" or "video" or "audio" or "document" or "sticker"))
                 return new List<StoredAttachment>();
             if (!message.TryGetProperty(messageType, out var media) || media.ValueKind != JsonValueKind.Object)
                 return new List<StoredAttachment> { new(messageType, null, null) };
 
-            var title = ReadString(media, "caption") ?? ReadString(media, "filename");
-            return new List<StoredAttachment> { new(Trim(messageType, 40), null, TrimOrNull(title, 200)) };
+            var title = TrimOrNull(ReadString(media, "caption") ?? ReadString(media, "filename"), 200);
+            var mediaId = ReadString(media, "id");
+
+            // Only images/stickers are mirrored to our own storage today; other media types keep the [type] placeholder.
+            if (!string.IsNullOrWhiteSpace(mediaId) && messageType is "image" or "sticker")
+                return new List<StoredAttachment> { await ResolveWhatsAppMediaAttachmentAsync(messageType, mediaId, title, ct) };
+
+            return new List<StoredAttachment> { new(Trim(messageType, 40), null, title) };
+        }
+
+        private async Task<StoredAttachment> ResolveWhatsAppMediaAttachmentAsync(string messageType, string mediaId, string? title, CancellationToken ct)
+        {
+            var fallback = new StoredAttachment(Trim(messageType, 40), null, title);
+            if (string.IsNullOrWhiteSpace(_options.WhatsAppAccessToken)) return fallback;
+            try
+            {
+                using var metaRequest = new HttpRequestMessage(HttpMethod.Get, $"{NormalizeVersion()}/{Uri.EscapeDataString(mediaId)}");
+                metaRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.WhatsAppAccessToken);
+                using var metaResponse = await _client.SendAsync(metaRequest, ct);
+                if (!metaResponse.IsSuccessStatusCode) return fallback;
+
+                using var metaDocument = JsonDocument.Parse(await metaResponse.Content.ReadAsStringAsync(ct));
+                var mediaUrl = ReadString(metaDocument.RootElement, "url");
+                var mimeType = ReadString(metaDocument.RootElement, "mime_type");
+                if (string.IsNullOrWhiteSpace(mediaUrl) || string.IsNullOrWhiteSpace(mimeType)) return fallback;
+
+                var extension = mimeType.Split(';')[0].Trim().ToLowerInvariant() switch
+                {
+                    "image/jpeg" => ".jpg",
+                    "image/png" => ".png",
+                    "image/webp" => ".webp",
+                    _ => null
+                };
+                if (extension is null) return fallback;
+
+                using var downloadRequest = new HttpRequestMessage(HttpMethod.Get, mediaUrl);
+                downloadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.WhatsAppAccessToken);
+                using var downloadResponse = await _client.SendAsync(downloadRequest, ct);
+                if (!downloadResponse.IsSuccessStatusCode) return fallback;
+
+                await using var bytes = await downloadResponse.Content.ReadAsStreamAsync(ct);
+                var permanentUrl = await _fileService.UploadImageAsync(
+                    new FileUploadRequest { FileName = $"{mediaId}{extension}", Content = bytes }, "meta-inbox", ct);
+                return new StoredAttachment(Trim(messageType, 40), TrimOrNull(permanentUrl, 2048), title);
+            }
+            catch
+            {
+                return fallback;
+            }
         }
 
         private static DateTime ReadWhatsAppTimestamp(JsonElement value)
@@ -805,6 +1299,53 @@ namespace Volt.Infrastructure.Services
                 catch (ArgumentOutOfRangeException) { }
             }
             return DateTime.UtcNow;
+        }
+
+        private static int? ReadInt(JsonElement value, string property)
+        {
+            if (value.ValueKind != JsonValueKind.Object || !value.TryGetProperty(property, out var item)) return null;
+            if (item.ValueKind == JsonValueKind.Number && item.TryGetInt32(out var number)) return number;
+            return item.ValueKind == JsonValueKind.String && int.TryParse(item.GetString(), out number) ? number : null;
+        }
+
+        private static string? NormalizeWhatsAppParticipant(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            var normalized = new string(value.Where(char.IsDigit).ToArray());
+            return normalized.Length is > 0 and <= 128 ? normalized : null;
+        }
+
+        private static string BuildHistoryFingerprint(
+            string phoneNumberId,
+            string participantId,
+            string? sender,
+            DateTime occurredAt,
+            string messageType,
+            string? text,
+            IReadOnlyList<StoredAttachment> attachments)
+        {
+            var material = string.Join('|',
+                phoneNumberId,
+                participantId,
+                sender ?? string.Empty,
+                occurredAt.Ticks.ToString(),
+                messageType,
+                TrimOrNull(text, 4000) ?? string.Empty,
+                attachments.FirstOrDefault()?.Title ?? string.Empty);
+            return "history:" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
+        }
+
+        private static string NormalizeHistoryDeliveryStatus(string? value, MetaInboxMessageDirection direction)
+        {
+            if (direction == MetaInboxMessageDirection.Incoming) return "received";
+            return value?.Trim().ToLowerInvariant() switch
+            {
+                "read" or "played" => "read",
+                "delivered" => "delivered",
+                "error" or "failed" => "failed",
+                "pending" or "sent" => "sent",
+                _ => "sent"
+            };
         }
 
         private static int DeliveryStatusRank(string? status) => status?.Trim().ToLowerInvariant() switch
@@ -878,6 +1419,14 @@ namespace Volt.Infrastructure.Services
         private static string? TrimOrNull(string? value, int max) => string.IsNullOrWhiteSpace(value) ? null : Trim(value, max);
         private static bool IsUniqueViolation(DbUpdateException exception) => exception.InnerException is SqlException { Number: 2601 or 2627 };
         private static ApiResponse<T> NotFound<T>() => ApiResponse<T>.ErrorResponse(ErrorCode.VALIDATION_ERROR, "Conversation was not found.");
+        private sealed record ConversationAccess(bool Exists, bool CanViewAll);
         private sealed record StoredAttachment(string Type, string? Url, string? Title);
+        private sealed record HistoryMessageDraft(
+            string ExternalMessageId,
+            MetaInboxMessageDirection Direction,
+            string? Text,
+            IReadOnlyList<StoredAttachment> Attachments,
+            string DeliveryStatus,
+            DateTime OccurredAt);
     }
 }

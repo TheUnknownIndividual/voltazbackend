@@ -16,6 +16,7 @@ namespace Volt.Infrastructure.Configuration
             builder.Property(x => x.Text).HasMaxLength(4000);
             builder.Property(x => x.AttachmentsJson).IsRequired().HasColumnType("nvarchar(max)");
             builder.Property(x => x.DeliveryStatus).IsRequired().HasMaxLength(32);
+            builder.Property(x => x.IsHistorical).HasDefaultValue(false);
             builder.HasIndex(x => new { x.ConversationId, x.ExternalMessageId })
                 .IsUnique().HasFilter("[ExternalMessageId] IS NOT NULL");
             builder.HasIndex(x => new { x.ConversationId, x.Id });

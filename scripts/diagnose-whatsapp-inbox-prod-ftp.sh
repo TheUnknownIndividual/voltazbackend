@@ -111,6 +111,14 @@ function printResult(label, result) {
     item?.object === 'whatsapp_business_account');
   const subscribedFields = (whatsappSubscription?.fields || []).map(field =>
     typeof field === 'string' ? field : field?.name);
+  const requiredWebhookFields = [
+    'messages',
+    'history',
+    'smb_message_echoes',
+    'smb_app_state_sync'
+  ];
+  const missingWebhookFields = requiredWebhookFields.filter(field =>
+    !subscribedFields.includes(field));
 
   console.log('\n=== SUMMARY ===');
   console.log(`${tokenData.is_valid === true ? 'PASS' : 'FAIL'} Token is valid`);
@@ -124,11 +132,19 @@ function printResult(label, result) {
   console.log(`${runtime.platform_type === 'CLOUD_API' ? 'PASS' : 'FAIL'} Phone platform is ${runtime.platform_type || 'not returned'}`);
   console.log(`${correctAppSubscribed ? 'PASS' : 'FAIL'} App is subscribed to the WABA`);
   console.log(`${whatsappSubscription ? 'PASS' : 'FAIL'} App has a whatsapp_business_account webhook subscription`);
-  console.log(`${subscribedFields.includes('messages') ? 'PASS' : 'FAIL'} Webhook messages field is subscribed`);
+  for (const field of requiredWebhookFields) {
+    console.log(`${subscribedFields.includes(field) ? 'PASS' : 'FAIL'} Webhook ${field} field is subscribed`);
+  }
+  console.log(`${missingWebhookFields.length === 0 ? 'PASS' : 'FAIL'} All required WhatsApp Coexistence webhook fields are subscribed`);
 
   if (whatsappSubscription) {
     console.log(`Webhook callback: ${whatsappSubscription.callback_url || 'not returned'}`);
     console.log(`Webhook active: ${String(whatsappSubscription.active ?? 'not returned')}`);
+  }
+
+  if (missingWebhookFields.length > 0) {
+    console.log(`Action required in Meta App Dashboard: subscribe ${missingWebhookFields.join(', ')}`);
+    console.log('Note: a successful WABA /subscribed_apps response does not subscribe these object fields.');
   }
 })().catch(error => {
   console.error(`Diagnostic failed: ${error.message}`);

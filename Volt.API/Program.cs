@@ -266,6 +266,11 @@ namespace Volt.API
                 client.BaseAddress = new Uri("https://graph.facebook.com/");
                 client.Timeout = TimeSpan.FromSeconds(8);
             });
+            builder.Services.AddHttpClient<IMetaInboxHistorySyncService, MetaInboxHistorySyncService>(client =>
+            {
+                client.BaseAddress = new Uri("https://graph.facebook.com/");
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
             builder.Services.AddHttpClient<IMetaWhatsAppOnboardingService, MetaWhatsAppOnboardingService>(client =>
             {
                 client.BaseAddress = new Uri("https://graph.facebook.com/");

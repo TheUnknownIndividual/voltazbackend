@@ -16,6 +16,7 @@ namespace Volt.Domain.Entities
         public int? SentByAdminUserId { get; set; }
         public AdminUser? SentByAdminUser { get; set; }
         public string DeliveryStatus { get; set; } = "received";
+        public bool IsHistorical { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }
