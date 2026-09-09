@@ -18,6 +18,15 @@ namespace Volt.Infrastructure.Services
             ".pdf", ".docx"
         };
 
+        // Covers the WhatsApp attachment types the Meta inbox mirrors: voice
+        // notes/audio, video, and common document formats.
+        private static readonly HashSet<string> MediaExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".ogg", ".oga", ".mp3", ".m4a", ".aac", ".amr", ".wav",
+            ".mp4", ".3gp", ".3gpp", ".mov",
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".zip"
+        };
+
         private readonly FtpOptions _ftpOptions;
 
         public FileService(IOptions<FtpOptions> ftpOptions)
@@ -30,6 +39,9 @@ namespace Volt.Infrastructure.Services
 
         public Task<string> UploadPdfAsync(FileUploadRequest file, string folderName, CancellationToken ct = default)
             => UploadFileAsync(file, folderName, PdfExtensions, ct);
+
+        public Task<string> UploadMediaAsync(FileUploadRequest file, string folderName, CancellationToken ct = default)
+            => UploadFileAsync(file, folderName, MediaExtensions, ct);
 
         public async Task DeleteFileAsync(string fileUrl, CancellationToken ct = default)
         {

@@ -1242,8 +1242,7 @@ namespace Volt.Infrastructure.Services
             var title = TrimOrNull(ReadString(media, "caption") ?? ReadString(media, "filename"), 200);
             var mediaId = ReadString(media, "id");
 
-            // Only images/stickers are mirrored to our own storage today; other media types keep the [type] placeholder.
-            if (!string.IsNullOrWhiteSpace(mediaId) && messageType is "image" or "sticker")
+            if (!string.IsNullOrWhiteSpace(mediaId) && messageType is "image" or "sticker" or "audio" or "video" or "document")
                 return new List<StoredAttachment> { await ResolveWhatsAppMediaAttachmentAsync(messageType, mediaId, title, ct) };
 
             return new List<StoredAttachment> { new(Trim(messageType, 40), null, title) };
@@ -1270,6 +1269,25 @@ namespace Volt.Infrastructure.Services
                     "image/jpeg" => ".jpg",
                     "image/png" => ".png",
                     "image/webp" => ".webp",
+                    "audio/ogg" or "audio/opus" => ".ogg",
+                    "audio/mpeg" => ".mp3",
+                    "audio/mp4" => ".m4a",
+                    "audio/aac" => ".aac",
+                    "audio/amr" or "audio/amr-nb" or "audio/amr-wb" => ".amr",
+                    "audio/wav" or "audio/x-wav" => ".wav",
+                    "video/mp4" => ".mp4",
+                    "video/3gpp" => ".3gp",
+                    "video/quicktime" => ".mov",
+                    "application/pdf" => ".pdf",
+                    "application/msword" => ".doc",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
+                    "application/vnd.ms-excel" => ".xls",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
+                    "application/vnd.ms-powerpoint" => ".ppt",
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
+                    "text/plain" => ".txt",
+                    "text/csv" => ".csv",
+                    "application/zip" => ".zip",
                     _ => null
                 };
                 if (extension is null) return fallback;
@@ -1280,8 +1298,10 @@ namespace Volt.Infrastructure.Services
                 if (!downloadResponse.IsSuccessStatusCode) return fallback;
 
                 await using var bytes = await downloadResponse.Content.ReadAsStreamAsync(ct);
-                var permanentUrl = await _fileService.UploadImageAsync(
-                    new FileUploadRequest { FileName = $"{mediaId}{extension}", Content = bytes }, "meta-inbox", ct);
+                var uploadRequest = new FileUploadRequest { FileName = $"{mediaId}{extension}", Content = bytes };
+                var permanentUrl = messageType is "image" or "sticker"
+                    ? await _fileService.UploadImageAsync(uploadRequest, "meta-inbox", ct)
+                    : await _fileService.UploadMediaAsync(uploadRequest, "meta-inbox", ct);
                 return new StoredAttachment(Trim(messageType, 40), TrimOrNull(permanentUrl, 2048), title);
             }
             catch

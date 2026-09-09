@@ -11,6 +11,7 @@ namespace Volt.Application.Interfaces
     {
         Task<string> UploadImageAsync(FileUploadRequest file, string folderName, CancellationToken ct = default);
         Task<string> UploadPdfAsync(FileUploadRequest file, string folderName, CancellationToken ct = default);
+        Task<string> UploadMediaAsync(FileUploadRequest file, string folderName, CancellationToken ct = default);
         Task DeleteFileAsync(string fileUrl, CancellationToken ct = default);
     }
 }
