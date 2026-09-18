@@ -10,6 +10,7 @@ namespace Volt.Infrastructure.Configuration
         {
             builder.ToTable("ContentAiGenerationJobs");
             builder.HasKey(x => x.Id);
+            builder.Property(x => x.Origin).IsRequired().HasMaxLength(16);
             builder.Property(x => x.ContentType).IsRequired().HasMaxLength(16);
             builder.Property(x => x.Status).IsRequired().HasMaxLength(32);
             builder.Property(x => x.RequestJson).IsRequired();

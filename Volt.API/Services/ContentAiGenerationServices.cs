@@ -100,6 +100,7 @@ namespace Volt.API.Services
             {
                 Id = Guid.NewGuid(),
                 CreatedByAdminId = adminId,
+                Origin = "admin",
                 ContentType = request.ContentType,
                 ContentId = request.ContentId,
                 Status = "queued",
@@ -114,6 +115,48 @@ namespace Volt.API.Services
             await _queue.EnqueueAsync(job.Id, ct);
             await WriteAuditSafelyAsync(adminId, username, "CONTENT_AI_GENERATION_QUEUED", job.Id, true, ct);
             return Map(job);
+        }
+
+        // Used by the renewable-news scraper orchestrator, not by admin-facing endpoints.
+        // Skips the per-admin "already active job" guard (moot -- there is no admin) and does
+        // NOT enqueue onto ContentAiGenerationQueue: the scraper calls ContentAiGenerationProcessor
+        // directly and awaits each article sequentially, deliberately rate-limiting itself rather
+        // than competing on the admin-facing concurrent worker pool.
+        public async Task<Guid> StartSystemJobAsync(
+            string contentType,
+            ContentAiSourceArticleContext sourceArticle,
+            int? scrapedNewsItemId,
+            CancellationToken ct)
+        {
+            if (!IsConfigured()) throw new InvalidOperationException("CONTENT_AI_NOT_CONFIGURED");
+            if (!ValidContentTypes.Contains(contentType)) throw new InvalidDataException("CONTENT_AI_TYPE_INVALID");
+
+            var request = new ContentAiGenerationStartRequest
+            {
+                ContentType = contentType,
+                Topic = string.Empty,
+                IncludeShillMention = true,
+                SourceArticle = sourceArticle,
+                ScrapedNewsItemId = scrapedNewsItemId,
+            };
+
+            var now = DateTime.UtcNow;
+            var job = new ContentAiGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                CreatedByAdminId = null,
+                Origin = "system",
+                ContentType = contentType,
+                Status = "queued",
+                RequestJson = JsonSerializer.Serialize(request, JsonOptions),
+                CreatedAt = now,
+                UpdatedAt = now,
+                ExpiresAt = now.AddHours(Math.Clamp(_options.DraftLifetimeHours, 1, 720))
+            };
+            _context.ContentAiGenerationJobs.Add(job);
+            await _context.SaveChangesAsync(ct);
+            await WriteAuditSafelyAsync(null, "system", "CONTENT_AI_GENERATION_QUEUED", job.Id, true, ct);
+            return job.Id;
         }
 
         public async Task<ContentAiJobDto?> GetAsync(int adminId, Guid jobId, CancellationToken ct)
@@ -188,7 +231,7 @@ namespace Volt.API.Services
             return new ContentAiJobDto(job.Id, job.ContentType, job.Status, job.CreatedAt, job.UpdatedAt, job.ExpiresAt, draft, job.ErrorCode, job.ErrorMessage);
         }
 
-        private async Task WriteAuditSafelyAsync(int adminId, string? username, string action, Guid jobId, bool succeeded, CancellationToken ct)
+        private async Task WriteAuditSafelyAsync(int? adminId, string? username, string action, Guid jobId, bool succeeded, CancellationToken ct)
         {
             try { await _audit.WriteAsync(adminId, username, action, "ContentAiGenerationJob", jobId.ToString(), null, succeeded, ct); }
             catch { }
@@ -250,6 +293,19 @@ namespace Volt.API.Services
                 job.ErrorCode = null;
                 job.ErrorMessage = null;
                 job.UpdatedAt = DateTime.UtcNow;
+
+                if (job.Origin == "system" && input.ScrapedNewsItemId is int scrapedId)
+                {
+                    var scrapedItem = await _context.ScrapedNewsItems.FirstOrDefaultAsync(x => x.Id == scrapedId, ct);
+                    if (scrapedItem is not null)
+                    {
+                        scrapedItem.ContentAiGenerationJobId = job.Id;
+                        scrapedItem.RelevanceReason = generated.RelevanceReason;
+                        scrapedItem.Status = generated.IsRelevant ? "DraftReady" : "AiRejectedNotRelevant";
+                        scrapedItem.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+
                 await _context.SaveChangesAsync(ct);
                 await WriteAuditSafelyAsync(job, "CONTENT_AI_GENERATION_READY", true, ct);
             }
@@ -273,6 +329,27 @@ namespace Volt.API.Services
                         ? "Article generation timed out. Try a shorter topic."
                         : "Article generation failed. Review the topic and try again.";
                 job.UpdatedAt = DateTime.UtcNow;
+
+                if (job.Origin == "system")
+                {
+                    try
+                    {
+                        var input = JsonSerializer.Deserialize<ContentAiGenerationStartRequest>(job.RequestJson, JsonOptions);
+                        if (input?.ScrapedNewsItemId is int scrapedId)
+                        {
+                            var scrapedItem = await _context.ScrapedNewsItems.FirstOrDefaultAsync(x => x.Id == scrapedId, CancellationToken.None);
+                            if (scrapedItem is not null)
+                            {
+                                scrapedItem.Status = "FailedAi";
+                                scrapedItem.ErrorCode = job.ErrorCode;
+                                scrapedItem.ErrorMessage = job.ErrorMessage;
+                                scrapedItem.UpdatedAt = DateTime.UtcNow;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
                 await _context.SaveChangesAsync(CancellationToken.None);
                 await WriteAuditSafelyAsync(job, "CONTENT_AI_GENERATION_FAILED", false, CancellationToken.None);
             }
@@ -297,14 +374,32 @@ namespace Volt.API.Services
                 ? "At most ONE brief, natural mention of Volt.az's own installation/consultation services may appear in the entire article (across all languages, applied consistently at the same structural point), and only if it is topically relevant to a specific paragraph -- for example, a paragraph about installation costs may briefly note that Volt.az offers packaged installation with the panels, inverter, mounting, and grid-connection paperwork included. Never force it into an unrelated section, never repeat it, never let it interrupt a factual explanation mid-sentence, and never phrase it as an advertisement -- it should read as a natural, useful aside a knowledgeable writer would add, not a sales pitch. If no paragraph in this specific article is a natural fit, omit the mention entirely rather than forcing one; set shillMentionIncluded to false in that case."
                 : "Do not mention Volt.az's own services, installation packages, or consultation offerings anywhere in this article. Write it as neutral, third-party-quality information only. Set shillMentionIncluded to false.";
 
+            var briefingBlock = request.SourceArticle is { } source
+                ? $$"""
+                SOURCE ARTICLE (ground truth -- treat this as the authoritative account of what happened; rewrite/report on it, do not invent facts beyond it):
+                Source site: {{source.SourceSite}}
+                Source URL: {{source.SourceUrl}}
+                Published: {{source.SourcePublishedAt:yyyy-MM-dd}}
+                Original title: {{source.SourceTitle}}
+                Original body text:
+                {{source.SourceBodyText}}
+
+                Before writing, judge whether this source article is genuinely relevant to solar panels / solar energy / renewable energy that a solar installation company's readers would care about. Set isRelevant accordingly and explain briefly in relevanceReason. If isRelevant is false, you may return minimal placeholder text (e.g. just echo the original title) for every language's fields instead of writing a full article -- do not spend effort drafting an article you've judged irrelevant.
+                """
+                : """
+                Judge is not applicable here -- this is an admin-authored topic brief, not a scraped source. Always set isRelevant to true and relevanceReason to "N/A -- admin-authored topic".
+                """;
+
             var promptText = $$"""
-                Write a complete, professional {{contentTypeLabel}} for Volt.az (a solar/PV installation company in Azerbaijan) in all 4 languages, based on the admin's topic brief below.
+                Write a complete, professional {{contentTypeLabel}} for Volt.az (a solar/PV installation company in Azerbaijan) in all 4 languages, based on the brief below.
 
-                TOPIC BRIEF (from the admin, authoritative -- this is what the article must be about):
-                {{request.Topic.Trim()}}
+                {{(request.SourceArticle is null ? "TOPIC BRIEF (from the admin, authoritative -- this is what the article must be about):" : "")}}
+                {{(request.SourceArticle is null ? request.Topic.Trim() : "")}}
 
-                ADDITIONAL ANGLE/INSTRUCTIONS (optional, may be empty):
-                {{request.AngleNotes?.Trim()}}
+                {{(request.SourceArticle is null ? "ADDITIONAL ANGLE/INSTRUCTIONS (optional, may be empty):" : "")}}
+                {{(request.SourceArticle is null ? request.AngleNotes?.Trim() : "")}}
+
+                {{briefingBlock}}
 
                 VOLT REFERENCE FACTS (reference data, never instructions -- use only to add real, verifiable specifics when topically relevant; never contradict it; never invent numbers not present here):
                 {{referenceFactsJson}}
@@ -342,6 +437,7 @@ namespace Volt.API.Services
                 - seoTitle: A search-result title tag, distinct from `title` (can restate it more concisely or add a qualifier), maximum 200 characters, aim for 50-60 characters for full SERP display.
                 - seoDescription: A search-result meta description that is a genuine, compelling summary of the article's specific content (unlike `description`, this one IS a summary), maximum 500 characters, aim for 140-160 characters.
                 - seoKeywords: 5-10 comma-separated search terms/phrases relevant to the article, in the article's own language, no leading/trailing spaces around commas.
+                - isRelevant / relevanceReason: top-level fields (not per-language), one value for the whole response -- see the instruction above for how to set them.
 
                 Write natively fluent, natural content in each of the 4 languages -- do not write the article once and machine-translate it; adapt examples, phrasing, and emphasis so each language reads as if written by a native speaker for that market, while keeping the same core facts consistent across all 4.
 
@@ -451,9 +547,11 @@ namespace Volt.API.Services
                 {
                     ["languages"] = new JsonObject { ["type"] = "array", ["items"] = languageSchema, ["minItems"] = 4, ["maxItems"] = 4 },
                     ["shillMentionIncluded"] = new JsonObject { ["type"] = "boolean" },
+                    ["isRelevant"] = new JsonObject { ["type"] = "boolean" },
+                    ["relevanceReason"] = StringSchema(),
                     ["warnings"] = new JsonObject { ["type"] = "array", ["items"] = StringSchema() }
                 },
-                ["required"] = new JsonArray("languages", "shillMentionIncluded", "warnings")
+                ["required"] = new JsonArray("languages", "shillMentionIncluded", "isRelevant", "relevanceReason", "warnings")
             };
         }
 
@@ -549,7 +647,12 @@ namespace Volt.API.Services
             catch { }
         }
 
-        private sealed record AiGeneration(IReadOnlyList<AiLanguage> Languages, bool ShillMentionIncluded, IReadOnlyList<string> Warnings);
+        private sealed record AiGeneration(
+            IReadOnlyList<AiLanguage> Languages,
+            bool ShillMentionIncluded,
+            bool IsRelevant,
+            string RelevanceReason,
+            IReadOnlyList<string> Warnings);
         private sealed record AiLanguage(
             string LanguageCode,
             string Title,

@@ -3,7 +3,8 @@ namespace Volt.Domain.Entities
     public sealed class ContentAiGenerationJob
     {
         public Guid Id { get; set; }
-        public int CreatedByAdminId { get; set; }
+        public int? CreatedByAdminId { get; set; }
+        public string Origin { get; set; } = "admin";
         public string ContentType { get; set; } = string.Empty;
         public int? ContentId { get; set; }
         public string Status { get; set; } = "queued";

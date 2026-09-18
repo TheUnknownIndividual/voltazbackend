@@ -9,7 +9,18 @@ namespace Volt.Application.Dtos.ContentAi
         public string Topic { get; set; } = string.Empty;
         public string? AngleNotes { get; set; }
         public bool IncludeShillMention { get; set; } = true;
+        public ContentAiSourceArticleContext? SourceArticle { get; set; }
+        public int? ScrapedNewsItemId { get; set; }
     }
+
+    // Grounding context for a scraper-originated (system) job -- when present, the processor
+    // rewrites this real source article instead of writing from an admin-typed topic brief.
+    public sealed record ContentAiSourceArticleContext(
+        string SourceSite,
+        string SourceUrl,
+        string SourceTitle,
+        string SourceBodyText,
+        DateTime SourcePublishedAt);
 
     public sealed record ContentAiLanguageDraftDto(
         LanguageCode LanguageCode,

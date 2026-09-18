@@ -21,6 +21,7 @@ using Volt.Domain.Interfaces;
 using Volt.Infrastructure.Configuration;
 using Volt.Infrastructure.Data;
 using Volt.Infrastructure.Services;
+using Volt.Infrastructure.Services.NewsScraping;
 using Volt.Infrastructure.UOW;
 
 namespace Volt.API
@@ -318,6 +319,16 @@ namespace Volt.API
                 client.Timeout = Timeout.InfiniteTimeSpan;
             });
             builder.Services.AddHostedService<ContentAiGenerationBackgroundService>();
+            builder.Services.Configure<RenewableNewsScraperOptions>(builder.Configuration.GetSection("RenewableNewsScraper"));
+            builder.Services.AddHttpClient("renewable-news-scraper", client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("VoltAzNewsBot/1.0 (+https://volt.az)");
+            });
+            builder.Services.AddScoped<INewsSourceScraper, MinenergyNewsScraper>();
+            builder.Services.AddScoped<INewsSourceScraper, AreaGovNewsScraper>();
+            builder.Services.AddScoped<RenewableNewsScraperRunner>();
+            builder.Services.AddHostedService<RenewableNewsScraperBackgroundService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();
