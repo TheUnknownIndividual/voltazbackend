@@ -38,6 +38,7 @@ namespace Volt.API
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IMetaInboxService", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IMetaWhatsAppOnboardingService", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient.ProductAiImportProcessor", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.ContentAiGenerationProcessor", LogLevel.Warning);
             // The Google Places request URL carries the API key as a query parameter;
             // keep this client at warning level for the same reason as Telegram/Meta above.
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IGoogleReviewsService", LogLevel.Warning);
@@ -157,6 +158,16 @@ namespace Volt.API
                     {
                         AutoReplenishment = true,
                         PermitLimit = 5,
+                        Window = TimeSpan.FromHours(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("content-ai-generate", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"content-ai-generate:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 10,
                         Window = TimeSpan.FromHours(1),
                         QueueLimit = 0
                     }));
@@ -298,6 +309,15 @@ namespace Volt.API
                 client.Timeout = Timeout.InfiniteTimeSpan;
             });
             builder.Services.AddHostedService<ProductAiImportBackgroundService>();
+            builder.Services.Configure<ContentAiOptions>(builder.Configuration.GetSection("ContentAiGeneration"));
+            builder.Services.AddSingleton<ContentAiGenerationQueue>();
+            builder.Services.AddScoped<ContentAiGenerationCoordinator>();
+            builder.Services.AddHttpClient<ContentAiGenerationProcessor>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.openai.com/v1/");
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            });
+            builder.Services.AddHostedService<ContentAiGenerationBackgroundService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();

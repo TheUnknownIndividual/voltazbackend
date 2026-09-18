@@ -84,6 +84,7 @@ namespace Volt.Infrastructure.Data
         public DbSet<ProductDescriptionLanguage> ProductDescriptionLanguages { get; set; }
         public DbSet<ProductPromotion> ProductPromotions { get; set; }
         public DbSet<ProductAiImportJob> ProductAiImportJobs { get; set; }
+        public DbSet<ContentAiGenerationJob> ContentAiGenerationJobs { get; set; }
         public DbSet<SolarInverterSpecification> SolarInverterSpecifications { get; set; }
         public DbSet<SolarInverterDatasheetDocument> SolarInverterDatasheetDocuments { get; set; }
         public DbSet<SolarSalesProject> SolarSalesProjects { get; set; }

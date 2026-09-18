@@ -11,5 +11,18 @@
     "MaxConcurrentJobs": 2,
     "ReasoningEffort": "low",
     "MaxOutputTokens": 16000
+  },
+  "ContentAiGeneration": {
+    "Enabled": false,
+    "ApiKey": "",
+    "Model": "gpt-5.6",
+    "DraftLifetimeHours": 168,
+    "RequestTimeoutSeconds": 180,
+    "MaxConcurrentJobs": 2,
+    "ReasoningEffort": "low",
+    "MaxOutputTokens": 16000,
+    "MinTopicLength": 10,
+    "MaxTopicLength": 400,
+    "MaxAngleNotesLength": 800
   }
 }
