@@ -183,8 +183,8 @@ namespace Volt.API
                         QueueLimit = 0
                     }));
 
-                options.AddPolicy("lalafo-prepare", context => RateLimitPartition.GetFixedWindowLimiter(
-                    $"lalafo-prepare:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? GetClientAddress(context)}",
+                options.AddPolicy("marketplace-prepare", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"marketplace-prepare:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? GetClientAddress(context)}",
                     _ => new FixedWindowRateLimiterOptions
                     {
                         AutoReplenishment = true,
@@ -193,8 +193,8 @@ namespace Volt.API
                         QueueLimit = 0
                     }));
 
-                options.AddPolicy("lalafo-payload", context => RateLimitPartition.GetFixedWindowLimiter(
-                    $"lalafo-payload:{GetClientAddress(context)}",
+                options.AddPolicy("marketplace-payload", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"marketplace-payload:{GetClientAddress(context)}",
                     _ => new FixedWindowRateLimiterOptions
                     {
                         AutoReplenishment = true,
@@ -349,12 +349,18 @@ namespace Volt.API
             builder.Services.AddScoped<INewsSourceScraper, AreaGovNewsScraper>();
             builder.Services.AddScoped<RenewableNewsScraperRunner>();
             builder.Services.AddHostedService<RenewableNewsScraperBackgroundService>();
+            builder.Services.Configure<MarketplaceListingsOptions>(builder.Configuration.GetSection("MarketplaceListings"));
             builder.Services.Configure<LalafoListingOptions>(builder.Configuration.GetSection("LalafoListing"));
-            builder.Services.AddHttpClient<LalafoListingService>(client =>
+            builder.Services.Configure<TapAzListingOptions>(builder.Configuration.GetSection("TapAzListing"));
+            builder.Services.AddHttpClient<MarketplaceAiClient>(client =>
             {
                 client.BaseAddress = new Uri("https://api.openai.com/v1/");
                 client.Timeout = Timeout.InfiniteTimeSpan;
             });
+            builder.Services.AddScoped<MarketplaceProductLoader>();
+            builder.Services.AddScoped<LalafoListingBuilder>();
+            builder.Services.AddScoped<TapAzListingBuilder>();
+            builder.Services.AddScoped<MarketplaceListingService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();

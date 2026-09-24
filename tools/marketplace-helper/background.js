@@ -11,13 +11,31 @@ function toBase64(buffer) {
   return btoa(binary);
 }
 
-async function fetchPayload(api, code) {
+function checkApi(api, code) {
   if (!ALLOWED_API_BASES.includes(api)) throw new Error("API base is not allowed");
   if (!/^[a-f0-9]{32}$/.test(code)) throw new Error("Invalid code");
-  const response = await fetch(`${api}/Lalafo/payload/${code}`);
+}
+
+async function fetchEnvelope(api, code) {
+  checkApi(api, code);
+  const response = await fetch(`${api}/Marketplace/payload/${code}`);
   const json = await response.json();
-  if (!response.ok || !json.success) throw new Error("Prepared ad not found or expired. Prepare it again in the Volt admin.");
+  if (!response.ok || !json.success) {
+    throw new Error("Prepared ad not found or expired. Prepare it again in the Volt admin.");
+  }
   return json.data;
+}
+
+async function report(api, code, body) {
+  checkApi(api, code);
+  const response = await fetch(`${api}/Marketplace/report/${code}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || !json.success) throw new Error("Could not record the listing in Volt");
+  return true;
 }
 
 async function fetchImage(url) {
@@ -33,8 +51,9 @@ async function fetchImage(url) {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const run = async () => {
-    if (message.type === "volt:fetchPayload") return fetchPayload(message.api, message.code);
+    if (message.type === "volt:fetchEnvelope") return fetchEnvelope(message.api, message.code);
     if (message.type === "volt:fetchImage") return fetchImage(message.url);
+    if (message.type === "volt:report") return report(message.api, message.code, message.body);
     throw new Error("Unknown message");
   };
   run().then(

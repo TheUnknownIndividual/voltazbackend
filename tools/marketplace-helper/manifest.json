@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Volt.az marketplace helper",
+  "version": "0.2.0",
+  "description": "Fills Lalafo and Tap.az ads from a product prepared in the Volt.az admin, using your own logged-in session.",
+  "host_permissions": [
+    "https://lalafo.az/*",
+    "https://tap.az/*",
+    "https://photos.tap.az/*",
+    "https://api.volt.az/*",
+    "https://test.api.volt.az/*",
+    "https://cloudfiles.volt.az/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://lalafo.az/*"],
+      "js": ["shared.js", "lalafo.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://tap.az/*"],
+      "js": ["shared.js", "tapaz.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
