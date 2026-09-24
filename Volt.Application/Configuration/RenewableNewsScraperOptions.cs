@@ -6,6 +6,8 @@ namespace Volt.Application.Configuration
         public int RunHourLocal { get; set; } = 7;
         public int LookbackDays { get; set; } = 3;
         public int MaxPagesPerSource { get; set; } = 5;
+        // renewables.az categories to scan (its own dedicated solar and national sections by default).
+        public string[] RenewablesAzCategories { get; set; } = new[] { "solar", "national" };
         public int InterArticleDelaySeconds { get; set; } = 5;
         public string[] RelevanceKeywords { get; set; } = new[]
         {

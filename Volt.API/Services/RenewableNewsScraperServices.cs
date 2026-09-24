@@ -272,9 +272,12 @@ namespace Volt.API.Services
                 return;
             }
 
-            var sourceLabel = item.SourceSite == "minenergy"
-                ? "Energetika Nazirliyi"
-                : "Bərpa Olunan Enerji Mənbələri üzrə Dövlət Agentliyi";
+            var sourceLabel = item.SourceSite switch
+            {
+                "minenergy" => "Energetika Nazirliyi",
+                "renewables" => "Renewables.az",
+                _ => "Bərpa Olunan Enerji Mənbələri üzrə Dövlət Agentliyi",
+            };
 
             var request = new NewsPostCreateRequest
             {

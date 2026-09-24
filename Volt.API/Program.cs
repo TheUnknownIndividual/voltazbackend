@@ -347,6 +347,7 @@ namespace Volt.API
             });
             builder.Services.AddScoped<INewsSourceScraper, MinenergyNewsScraper>();
             builder.Services.AddScoped<INewsSourceScraper, AreaGovNewsScraper>();
+            builder.Services.AddScoped<INewsSourceScraper, RenewablesAzNewsScraper>();
             builder.Services.AddScoped<RenewableNewsScraperRunner>();
             builder.Services.AddHostedService<RenewableNewsScraperBackgroundService>();
             builder.Services.Configure<MarketplaceListingsOptions>(builder.Configuration.GetSection("MarketplaceListings"));
