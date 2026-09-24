@@ -14,5 +14,11 @@ namespace Volt.Application.Configuration
         };
         public int MaxImageBytes { get; set; } = 8 * 1024 * 1024;
         public int ImageDownloadTimeoutSeconds { get; set; } = 20;
+
+        // The VPS cannot reach minenergy.gov.az/area.gov.az directly (outbound blocked).
+        // When set, all fetches to those sites are routed through an allowlisted relay
+        // instead of being made directly. Leave both empty to fetch directly as before.
+        public string? RelayBaseUrl { get; set; }
+        public string? RelayAuthToken { get; set; }
     }
 }

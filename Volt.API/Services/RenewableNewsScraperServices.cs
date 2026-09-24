@@ -8,6 +8,7 @@ using Volt.Application.Interfaces;
 using Volt.Domain.Entities;
 using Volt.Domain.Enums;
 using Volt.Infrastructure.Data;
+using Volt.Infrastructure.Services.NewsScraping;
 
 namespace Volt.API.Services
 {
@@ -103,11 +104,12 @@ namespace Volt.API.Services
                 {
                     await _context.SaveChangesAsync(ct);
                 }
-                catch (DbUpdateException)
+                catch (DbUpdateException ex)
                 {
                     // Lost a race against a concurrent insert of the same SourceUrl -- fine,
                     // it's already recorded. Detach so the failed insert doesn't poison the
                     // change tracker for subsequent saves in this run.
+                    _logger.LogInformation(ex, "Duplicate SourceUrl on insert (expected under concurrent runs)");
                     foreach (var entry in _context.ChangeTracker.Entries<ScrapedNewsItem>().ToList())
                         entry.State = EntityState.Detached;
                 }
@@ -162,15 +164,19 @@ namespace Volt.API.Services
             {
                 ct.ThrowIfCancellationRequested();
 
-                var imageUrls = DeserializeImageUrls(item.SourceDetailImageUrlsJson);
-                var candidateImage = imageUrls.FirstOrDefault() ?? item.SourceListingImageUrl;
-                if (!string.IsNullOrWhiteSpace(candidateImage))
-                {
-                    item.RehostedImageUrl = await TryRehostImageAsync(candidateImage, ct);
-                }
-
                 var isPlausiblyRelevant = RenewableNewsRelevanceHeuristic.IsPlausiblyRelevant(
                     item.SourceTitle, item.RawBodyText ?? string.Empty, _options.RelevanceKeywords);
+
+                if (isPlausiblyRelevant)
+                {
+                    var imageUrls = DeserializeImageUrls(item.SourceDetailImageUrlsJson);
+                    var candidateImage = imageUrls.FirstOrDefault() ?? item.SourceListingImageUrl;
+                    if (!string.IsNullOrWhiteSpace(candidateImage))
+                    {
+                        item.RehostedImageUrl = await TryRehostImageAsync(candidateImage, ct);
+                    }
+                }
+
                 item.Status = isPlausiblyRelevant ? "PendingAiReview" : "FilteredKeywordReject";
                 item.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync(ct);
@@ -306,7 +312,7 @@ namespace Volt.API.Services
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(_options.ImageDownloadTimeoutSeconds, 5, 60)));
 
-                using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
+                using var response = await RelayFetch.GetResponseAsync(client, _options, uri, timeoutCts.Token);
                 if (!response.IsSuccessStatusCode) return null;
 
                 var mediaType = response.Content.Headers.ContentType?.MediaType;
@@ -339,6 +345,11 @@ namespace Volt.API.Services
                     "scraped-news",
                     ct);
                 return uploaded;
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                _logger.LogWarning("Timed out rehosting image {RemoteImageUrl}", remoteImageUrl);
+                return null;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -399,8 +410,13 @@ namespace Volt.API.Services
                         var nowBaku = AzerbaijanClock.Now;
                         var runState = await context.RenewableNewsScraperRunState.FirstOrDefaultAsync(x => x.Id == 1, stoppingToken);
                         var today = DateOnly.FromDateTime(nowBaku);
+                        var shouldRun = nowBaku.Hour >= _options.RunHourLocal && (runState is null || runState.LastRunDateUtc != today);
 
-                        if (nowBaku.Hour >= _options.RunHourLocal && (runState is null || runState.LastRunDateUtc != today))
+                        _logger.LogInformation(
+                            "RenewableNewsScraper gate check: nowBaku={NowBaku} runHourLocal={RunHourLocal} lastRunDateUtc={LastRunDateUtc} willRun={WillRun}",
+                            nowBaku, _options.RunHourLocal, runState?.LastRunDateUtc, shouldRun);
+
+                        if (shouldRun)
                         {
                             if (runState is null)
                             {

@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using AngleSharp.Html.Parser;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Volt.Application.Common;
 using Volt.Application.Configuration;
@@ -15,12 +16,17 @@ namespace Volt.Infrastructure.Services.NewsScraping
         private const string BaseUrl = "https://minenergy.gov.az/az/xeberler-arxivi";
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly RenewableNewsScraperOptions _options;
+        private readonly ILogger<MinenergyNewsScraper> _logger;
         private readonly HtmlParser _parser = new();
 
-        public MinenergyNewsScraper(IHttpClientFactory httpClientFactory, IOptions<RenewableNewsScraperOptions> options)
+        public MinenergyNewsScraper(
+            IHttpClientFactory httpClientFactory,
+            IOptions<RenewableNewsScraperOptions> options,
+            ILogger<MinenergyNewsScraper> logger)
         {
             _httpClientFactory = httpClientFactory;
             _options = options.Value;
+            _logger = logger;
         }
 
         public string SourceSite => "minenergy";
@@ -40,16 +46,21 @@ namespace Volt.Infrastructure.Services.NewsScraping
                 string html;
                 try
                 {
-                    html = await client.GetStringAsync(pageUrl, ct);
+                    html = await RelayFetch.GetStringAsync(client, _options, pageUrl, ct);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "Minenergy discovery failed fetching {PageUrl}", pageUrl);
                     yield break;
                 }
 
                 using var document = await _parser.ParseDocumentAsync(html, ct);
                 var items = document.QuerySelectorAll("article.Post-item");
-                if (items.Length == 0) yield break;
+                if (items.Length == 0)
+                {
+                    _logger.LogInformation("Minenergy: 0 items found on {PageUrl}", pageUrl);
+                    yield break;
+                }
 
                 var reachedCutoff = false;
                 foreach (var item in items)
@@ -83,7 +94,7 @@ namespace Volt.Infrastructure.Services.NewsScraping
         public async Task<ScrapedArticleDetail> FetchDetailAsync(string sourceUrl, CancellationToken ct)
         {
             var client = _httpClientFactory.CreateClient("renewable-news-scraper");
-            var html = await client.GetStringAsync(sourceUrl, ct);
+            var html = await RelayFetch.GetStringAsync(client, _options, sourceUrl, ct);
             using var document = await _parser.ParseDocumentAsync(html, ct);
 
             var title = document.QuerySelector("h1.Page-header__title")?.TextContent?.Trim() ?? string.Empty;
