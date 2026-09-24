@@ -31,16 +31,36 @@
     }
   }`;
 
-  const run = async () => {
+  let me = null;
+  let resolved = null;
+
+  const ensureLogin = async () => {
+    if (me) return me;
+    panel.log("Checking your Tap.az login...");
+    me = (await gql("{ currentUser { name email phone } }")).data?.currentUser;
+    if (!me) throw new Error("You are not logged in to Tap.az. Log in and prepare the ad again.");
+    return me;
+  };
+
+  const resolveIds = async (payload) => {
+    if (resolved) return resolved;
+    const tree = (await gql("{ categories(scope: CREATE_AD) { id legacyResourceId children { id legacyResourceId children { id legacyResourceId } } } }")).data?.categories;
+    const category = findCategory(tree, payload.categoryId);
+    const regions = (await gql("{ regions { id legacyResourceId } }")).data?.regions || [];
+    const region = regions.find((r) => String(r.legacyResourceId) === String(payload.regionId));
+    if (!category || !region) throw new Error("Could not resolve the Tap.az category or region.");
+    resolved = { category, region };
+    return resolved;
+  };
+
+  const processItem = async (code, { auto }) => {
     panel.log("Loading the prepared ad from Volt.az...");
-    const envelope = await Volt.loadEnvelope(session, "tapaz");
+    const envelope = await Volt.loadEnvelope(session, code, "tapaz");
     const payload = envelope.payload;
     panel.log("Ad: " + payload.productName, "ok");
 
-    panel.log("Checking your Tap.az login...");
-    const me = (await gql("{ currentUser { name email phone } }")).data?.currentUser;
-    if (!me) throw new Error("You are not logged in to Tap.az. Log in and prepare the ad again.");
-    panel.log("Logged in as " + (me.name || me.email || "your account") + ".", "ok");
+    const user = await ensureLogin();
+    panel.log("Logged in as " + (user.name || user.email || "your account") + ".", "ok");
 
     const photoIds = [];
     for (let i = 0; i < payload.imageUrls.length; i++) {
@@ -66,15 +86,6 @@
       }
     }
 
-    panel.preview(
-      payload.title + "\n" +
-      (payload.price ? payload.price + " AZN" : "No price set") + "\n" +
-      payload.targetLabel + "\n" +
-      "Photos: " + photoIds.length + "\n\n" + payload.body
-    );
-    for (const warning of payload.warnings || []) panel.note("Check: " + warning, "warn");
-    panel.note("Tap.az has no draft step: Publish submits the ad to Tap.az moderation.", "warn");
-
     const buildParams = (categoryId, regionId) => ({
       title: payload.title,
       body: payload.body,
@@ -85,9 +96,9 @@
       source: "DESKTOP",
       contactAttributes: {
         contactType: "CALLS_AND_MESSAGES",
-        email: me.email || "",
-        name: me.name || "",
-        phones: [me.phone || ""],
+        email: user.email || "",
+        name: user.name || "",
+        phones: [user.phone || ""],
       },
       propertySet: {
         collection: payload.properties.map((p) => ({ legacyId: String(p.propertyId), value: String(p.optionId) })),
@@ -102,47 +113,58 @@
       return result;
     };
 
-    panel.button("Publish on Tap.az", "pub", async (el) => {
-      el.disabled = true;
+    const publish = async () => {
+      if (!payload.price) throw new Error("Tap.az requires a price. Set one on the product first.");
+      if (photoIds.length === 0) throw new Error("Tap.az requires at least one photo.");
+      if (!user.phone) throw new Error("Add a phone number to your Tap.az profile first.");
+
+      const { category, region } = await resolveIds(payload);
+      let result = await submit(buildParams(category.id, region.id));
+      const idProblem = (result.errors || []).some((e) => (e.path || []).some((p) => /categoryId|regionId/.test(p)));
+      if (!result.entity && idProblem) {
+        panel.log("Retrying with numeric ids...", "warn");
+        result = await submit(buildParams(String(category.legacyResourceId), String(region.legacyResourceId)));
+      }
+      if (!result.entity) {
+        const messages = (result.errors || []).map((e) => e.message).join("; ") || "unknown error";
+        throw new Error("Tap.az rejected the ad: " + messages);
+      }
+
+      const entity = result.entity;
+      const url = entity.path ? "https://tap.az" + (entity.path.startsWith("/") ? entity.path : "/" + entity.path) : null;
+      const status = /publish|active/i.test(entity.status || "") ? "published" : "pending";
+      panel.log("Submitted to Tap.az" + (entity.statusMessage ? ": " + entity.statusMessage : "."), "ok");
+      await Volt.report(session, code, { externalId: String(entity.legacyResourceId || entity.id), url, status }, panel);
+      return { status };
+    };
+
+    if (auto) {
+      panel.log("Publishing automatically...");
+      return publish();
+    }
+
+    panel.preview(
+      payload.title + "\n" +
+      (payload.price ? payload.price + " AZN" : "No price set") + "\n" +
+      payload.targetLabel + "\n" +
+      "Photos: " + photoIds.length + "\n\n" + payload.body
+    );
+    for (const warning of payload.warnings || []) panel.note("Check: " + warning, "warn");
+    panel.note("Tap.az has no draft step: Publish submits the ad to Tap.az moderation.", "warn");
+
+    for (;;) {
+      const choice = await panel.decide([
+        { key: "publish", label: "Publish on Tap.az", cls: "pub" },
+        { key: "skip", label: "Skip / next", cls: "sec" },
+      ]);
+      if (choice === "skip") return { status: "skipped" };
       try {
-        if (!payload.price) throw new Error("Tap.az requires a price. Set one on the product first.");
-        if (photoIds.length === 0) throw new Error("Tap.az requires at least one photo.");
-        if (!me.phone) throw new Error("Add a phone number to your Tap.az profile first.");
-
-        const tree = (await gql("{ categories(scope: CREATE_AD) { id legacyResourceId children { id legacyResourceId children { id legacyResourceId } } } }")).data?.categories;
-        const category = findCategory(tree, payload.categoryId);
-        const regions = (await gql("{ regions { id legacyResourceId } }")).data?.regions || [];
-        const region = regions.find((r) => String(r.legacyResourceId) === String(payload.regionId));
-        if (!category || !region) throw new Error("Could not resolve the Tap.az category or region.");
-
-        let result = await submit(buildParams(category.id, region.id));
-        const idProblem = (result.errors || []).some((e) => (e.path || []).some((p) => /categoryId|regionId/.test(p)));
-        if (!result.entity && idProblem) {
-          panel.log("Retrying with numeric ids...", "warn");
-          result = await submit(buildParams(String(category.legacyResourceId), String(region.legacyResourceId)));
-        }
-
-        if (!result.entity) {
-          const messages = (result.errors || []).map((e) => e.message).join("; ") || "unknown error";
-          throw new Error("Tap.az rejected the ad: " + messages);
-        }
-
-        const entity = result.entity;
-        const url = entity.path ? "https://tap.az" + (entity.path.startsWith("/") ? entity.path : "/" + entity.path) : null;
-        const status = /publish|active/i.test(entity.status || "") ? "published" : "pending";
-        panel.log("Submitted to Tap.az" + (entity.statusMessage ? ": " + entity.statusMessage : "."), "ok");
-        await Volt.report(session, { externalId: String(entity.legacyResourceId || entity.id), url, status }, panel);
-        if (url) panel.button("Open ad", "sec", () => window.open(url, "_blank"));
+        return await publish();
       } catch (error) {
         panel.log(error.message, "err");
-        el.disabled = false;
       }
-    });
-    panel.button("Close", "sec", panel.close);
+    }
   };
 
-  run().catch((error) => {
-    panel.log(error.message || String(error), "err");
-    panel.button("Close", "sec", panel.close);
-  });
+  Volt.runBatch(session, "Tap.az", panel, processItem);
 })();

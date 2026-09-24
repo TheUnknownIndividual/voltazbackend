@@ -64,6 +64,19 @@ namespace Volt.API.Services
             _logger = logger;
         }
 
+        // True when a previous run (e.g. cut short by an app-pool recycle) left articles mid-pipeline.
+        public Task<bool> HasUnfinishedItemsAsync(CancellationToken ct)
+            => _context.ScrapedNewsItems.AnyAsync(x =>
+                x.Status == "Discovered" || x.Status == "Detailed" ||
+                x.Status == "PendingAiReview" || x.Status == "AiReviewProcessing", ct);
+
+        public async Task ResumeUnfinishedAsync(CancellationToken ct)
+        {
+            await FetchDetailsAsync(ct);
+            await FilterAndRehostAsync(ct);
+            await GenerateAndPublishAsync(ct);
+        }
+
         public async Task RunDailyScrapeAsync(CancellationToken ct)
         {
             var lookbackCutoffUtc = DateTime.UtcNow.AddDays(-Math.Max(1, _options.LookbackDays));
@@ -429,6 +442,15 @@ namespace Volt.API.Services
 
                             var runner = scope.ServiceProvider.GetRequiredService<RenewableNewsScraperRunner>();
                             await runner.RunDailyScrapeAsync(stoppingToken);
+                        }
+                        else if (runState is not null && runState.LastRunDateUtc == today)
+                        {
+                            var runner = scope.ServiceProvider.GetRequiredService<RenewableNewsScraperRunner>();
+                            if (await runner.HasUnfinishedItemsAsync(stoppingToken))
+                            {
+                                _logger.LogInformation("RenewableNewsScraper resuming unfinished articles from today's run");
+                                await runner.ResumeUnfinishedAsync(stoppingToken);
+                            }
                         }
                     }
                 }

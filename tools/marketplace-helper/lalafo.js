@@ -65,9 +65,9 @@
     return json;
   };
 
-  const run = async () => {
+  const processItem = async (code, { auto }) => {
     panel.log("Loading the prepared ad from Volt.az...");
-    const envelope = await Volt.loadEnvelope(session, "lalafo");
+    const envelope = await Volt.loadEnvelope(session, code, "lalafo");
     const payload = envelope.payload;
     panel.log("Ad: " + payload.productName, "ok");
 
@@ -116,7 +116,20 @@
     panel.log("Saving the ad details...");
     const saved = await putAd(id, buildBody(id, payload, imageIds, contact, false));
     panel.log("Draft is filled.", "ok");
-    await Volt.report(session, { externalId: String(id), url: saved.url || null, status: "draft" }, panel);
+    await Volt.report(session, code, { externalId: String(id), url: saved.url || null, status: "draft" }, panel);
+
+    const publish = async () => {
+      const result = await putAd(id, buildBody(id, payload, imageIds, contact, true));
+      if (result.rejected_reason) throw new Error("Lalafo response: " + result.rejected_reason);
+      await Volt.report(session, code, { externalId: String(id), url: result.url || saved.url || null, status: "published" }, panel);
+      panel.log("Publish request sent. Check your Lalafo ads to confirm it went live.", "ok");
+    };
+
+    if (auto) {
+      panel.log("Publishing automatically...");
+      await publish();
+      return { status: "published" };
+    }
 
     const selected = (saved.params || [])
       .map((p) => {
@@ -124,7 +137,6 @@
         return values.length ? p.name + ": " + values.join(", ") : null;
       })
       .filter(Boolean);
-
     panel.preview(
       (saved.title || payload.title) + "\n" +
       (payload.price ? payload.price + " " + payload.currency : "Price by agreement") + "\n" +
@@ -134,27 +146,25 @@
     );
     for (const warning of payload.warnings || []) panel.note("Check: " + warning, "warn");
 
-    panel.button("Publish on Lalafo", "pub", async (el) => {
-      el.disabled = true;
+    for (;;) {
+      const choice = await panel.decide([
+        { key: "publish", label: "Publish on Lalafo", cls: "pub" },
+        { key: "open", label: "Open draft page", cls: "sec" },
+        { key: "skip", label: "Leave as draft / next", cls: "sec" },
+      ]);
+      if (choice === "open") {
+        window.open(saved.url || "https://lalafo.az/", "_blank");
+        continue;
+      }
+      if (choice === "skip") return { status: "draft" };
       try {
-        const result = await putAd(id, buildBody(id, payload, imageIds, contact, true));
-        if (result.rejected_reason) {
-          panel.log("Lalafo response: " + result.rejected_reason, "warn");
-        } else {
-          panel.log("Publish request sent. Check your Lalafo ads to confirm it went live.", "ok");
-          await Volt.report(session, { externalId: String(id), url: result.url || saved.url || null, status: "published" }, panel);
-        }
+        await publish();
+        return { status: "published" };
       } catch (error) {
         panel.log(error.message, "err");
-        el.disabled = false;
       }
-    });
-    panel.button("Open draft page", "sec", () => window.open(saved.url || "https://lalafo.az/", "_blank"));
-    panel.button("Close", "sec", panel.close);
+    }
   };
 
-  run().catch((error) => {
-    panel.log(error.message || String(error), "err");
-    panel.button("Close", "sec", panel.close);
-  });
+  Volt.runBatch(session, "Lalafo", panel, processItem);
 })();

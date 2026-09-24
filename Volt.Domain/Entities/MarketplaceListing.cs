@@ -6,6 +6,8 @@ namespace Volt.Domain.Entities
     {
         public int Id { get; set; }
         public int ProductId { get; set; }
+        // The variant (ProductParametr) this listing is for; null when the whole product was posted.
+        public int? VariantId { get; set; }
         public string Marketplace { get; set; } = string.Empty;
         public string ExternalId { get; set; } = string.Empty;
         public string? Url { get; set; }

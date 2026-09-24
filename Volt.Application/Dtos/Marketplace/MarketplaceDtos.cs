@@ -12,6 +12,10 @@ namespace Volt.Application.Dtos.Marketplace
     {
         public int ProductId { get; set; }
         public string Marketplace { get; set; } = string.Empty;
+        // Empty means every active variant of the product (or the product itself when it has none).
+        public List<int> VariantIds { get; set; } = new();
+        // Post again even when this marketplace already has a pending/published listing for the variant.
+        public bool Force { get; set; }
     }
 
     public sealed class MarketplaceReportRequest
@@ -24,6 +28,7 @@ namespace Volt.Application.Dtos.Marketplace
     public sealed class MarketplaceListingDto
     {
         public int ProductId { get; set; }
+        public int? VariantId { get; set; }
         public string Marketplace { get; set; } = string.Empty;
         public string ExternalId { get; set; } = string.Empty;
         public string? Url { get; set; }
@@ -42,17 +47,33 @@ namespace Volt.Application.Dtos.Marketplace
     {
         public string Marketplace { get; set; } = string.Empty;
         public int ProductId { get; set; }
+        public int? VariantId { get; set; }
         public object Payload { get; set; } = new();
     }
 
-    public sealed class MarketplacePreparedDto
+    public sealed class MarketplacePreparedItemDto
     {
         public string Code { get; set; } = string.Empty;
+        public int? VariantId { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public List<string> Warnings { get; set; } = new();
+    }
+
+    public sealed class MarketplaceSkippedDto
+    {
+        public int? VariantId { get; set; }
+        public string Label { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    public sealed class MarketplaceBatchDto
+    {
         public string Marketplace { get; set; } = string.Empty;
         public DateTime ExpiresAtUtc { get; set; }
         public string ProductName { get; set; } = string.Empty;
-        public string Title { get; set; } = string.Empty;
-        public List<string> Warnings { get; set; } = new();
+        public List<MarketplacePreparedItemDto> Items { get; set; } = new();
+        public List<MarketplaceSkippedDto> Skipped { get; set; } = new();
     }
 
     public sealed class LalafoParamSelection

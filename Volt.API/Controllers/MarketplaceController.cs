@@ -32,12 +32,12 @@ namespace Volt.API.Controllers
         {
             try
             {
-                var prepared = await _service.PrepareAsync(request, ct);
-                return CreateActionResult(ApiResponse<MarketplacePreparedDto>.SuccessResponse(prepared));
+                var batch = await _service.PrepareBatchAsync(request, ct);
+                return CreateActionResult(ApiResponse<MarketplaceBatchDto>.SuccessResponse(batch));
             }
             catch (InvalidOperationException ex)
             {
-                return CreateActionResult(ApiResponse<MarketplacePreparedDto>.ErrorResponse(
+                return CreateActionResult(ApiResponse<MarketplaceBatchDto>.ErrorResponse(
                     ErrorCode.VALIDATION_ERROR, ex.Message));
             }
         }

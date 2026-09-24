@@ -19,3 +19,9 @@ END
 
 IF NOT EXISTS (SELECT 1 FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20260924120000_AddMarketplaceListings')
     INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion]) VALUES (N'20260924120000_AddMarketplaceListings', N'8.0.24');
+
+IF COL_LENGTH('MarketplaceListings', 'VariantId') IS NULL
+    ALTER TABLE [MarketplaceListings] ADD [VariantId] int NULL;
+
+IF NOT EXISTS (SELECT 1 FROM [__EFMigrationsHistory] WHERE [MigrationId] = N'20260924150000_AddMarketplaceListingVariantId')
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion]) VALUES (N'20260924150000_AddMarketplaceListingVariantId', N'8.0.24');
