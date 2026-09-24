@@ -183,6 +183,26 @@ namespace Volt.API
                         QueueLimit = 0
                     }));
 
+                options.AddPolicy("lalafo-prepare", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"lalafo-prepare:{context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 30,
+                        Window = TimeSpan.FromHours(1),
+                        QueueLimit = 0
+                    }));
+
+                options.AddPolicy("lalafo-payload", context => RateLimitPartition.GetFixedWindowLimiter(
+                    $"lalafo-payload:{GetClientAddress(context)}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        AutoReplenishment = true,
+                        PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+
                 options.AddPolicy("meta-webhook", context => RateLimitPartition.GetFixedWindowLimiter(
                     $"meta-webhook:{GetClientAddress(context)}",
                     _ => new FixedWindowRateLimiterOptions
@@ -329,6 +349,12 @@ namespace Volt.API
             builder.Services.AddScoped<INewsSourceScraper, AreaGovNewsScraper>();
             builder.Services.AddScoped<RenewableNewsScraperRunner>();
             builder.Services.AddHostedService<RenewableNewsScraperBackgroundService>();
+            builder.Services.Configure<LalafoListingOptions>(builder.Configuration.GetSection("LalafoListing"));
+            builder.Services.AddHttpClient<LalafoListingService>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.openai.com/v1/");
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            });
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();

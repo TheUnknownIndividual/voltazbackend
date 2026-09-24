@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Volt.az to Lalafo helper",
+  "version": "0.1.0",
+  "description": "Fills a Lalafo ad from a product prepared in the Volt.az admin, using your own logged-in Lalafo session.",
+  "host_permissions": [
+    "https://lalafo.az/*",
+    "https://api.volt.az/*",
+    "https://test.api.volt.az/*",
+    "https://cloudfiles.volt.az/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://lalafo.az/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
