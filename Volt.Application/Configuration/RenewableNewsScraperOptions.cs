@@ -13,6 +13,7 @@ namespace Volt.Application.Configuration
         {
             "günəş", "solar", "panel", "fotoelektrik", "PV", "bərpa olunan enerji",
             "yenilənən enerji", "yaşıl enerji", "invertor", "şəbəkəyə qoşulma",
+            "saxlama", "batareya", "GES", "külək", "elektrik stansiyası", "MVt",
         };
         public int MaxImageBytes { get; set; } = 8 * 1024 * 1024;
         public int ImageDownloadTimeoutSeconds { get; set; } = 20;
