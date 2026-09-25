@@ -1,0 +1,11 @@
+{
+  "SocialPosting": {
+    "Enabled": true,
+    "DryRun": true,
+    "FacebookPageId": "",
+    "FacebookPageAccessToken": "",
+    "InstagramUserId": "",
+    "InstagramAccessToken": "",
+    "InstagramTokenIssuedOn": "2026-09-25"
+  }
+}

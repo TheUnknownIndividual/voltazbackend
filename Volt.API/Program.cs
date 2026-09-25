@@ -43,6 +43,8 @@ namespace Volt.API
             // The Google Places request URL carries the API key as a query parameter;
             // keep this client at warning level for the same reason as Telegram/Meta above.
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IGoogleReviewsService", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.MetaSocialPublisher", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.SocialImageService", LogLevel.Warning);
 
             // This optional file is provisioned only on the production server
             // by the FTP deploy script. It keeps Telegram integration secrets
@@ -53,6 +55,7 @@ namespace Volt.API
                 .AddJsonFile("meta-inbox.production.json", optional: true, reloadOnChange: false)
                 .AddJsonFile("openai.production.json", optional: true, reloadOnChange: false)
                 .AddJsonFile("googlereviews.production.json", optional: true, reloadOnChange: false)
+                .AddJsonFile("social-posting.production.json", optional: true, reloadOnChange: false)
                 .AddEnvironmentVariables();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -362,6 +365,11 @@ namespace Volt.API
             builder.Services.AddScoped<LalafoListingBuilder>();
             builder.Services.AddScoped<TapAzListingBuilder>();
             builder.Services.AddScoped<MarketplaceListingService>();
+            builder.Services.Configure<SocialPostingOptions>(builder.Configuration.GetSection("SocialPosting"));
+            builder.Services.AddHttpClient<MetaSocialPublisher>(client => client.Timeout = TimeSpan.FromSeconds(45));
+            builder.Services.AddHttpClient<SocialImageService>(client => client.Timeout = TimeSpan.FromSeconds(20));
+            builder.Services.AddScoped<SocialPostingRunner>();
+            builder.Services.AddHostedService<SocialPostingBackgroundService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();
