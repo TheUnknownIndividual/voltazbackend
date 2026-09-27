@@ -19,7 +19,8 @@ namespace Volt.API.Services
         string Title,
         string SourceText,
         string? ImageUrl,
-        string LinkUrl);
+        string LinkUrl,
+        int? Price = null);
 
     internal sealed class SocialAiDecision
     {
@@ -287,13 +288,17 @@ namespace Volt.API.Services
                 try
                 {
                     var loaded = await _productLoader.LoadAsync(item.Id, ct);
-                    var snapshot = loaded.Snapshot(null, 1);
+                    // Pick a real variant (not null) so price and specs actually reach the AI and the caption.
+                    var variantId = loaded.Variants.Count > 0 ? loaded.Variants[0].Id : (int?)null;
+                    var snapshot = loaded.Snapshot(variantId, 1);
                     if (snapshot.ImageUrls.Count == 0) continue;
                     var sourceText = JsonSerializer.Serialize(snapshot.Context, new JsonSerializerOptions(JsonSerializerDefaults.Web)
                     {
                         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                     });
-                    result.Add(new SocialCandidate("product", item.Id, snapshot.ProductName, sourceText, snapshot.ImageUrls[0], $"{SiteBase}/product/{item.Id}"));
+                    result.Add(new SocialCandidate(
+                        "product", item.Id, snapshot.ProductName, sourceText, snapshot.ImageUrls[0], $"{SiteBase}/product/{item.Id}",
+                        Price: snapshot.Price));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -343,8 +348,18 @@ namespace Volt.API.Services
             }
 
             var hashtags = BuildHashtags(decision.Hashtags);
-            var facebookCaption = $"{body}\n\n{candidate.LinkUrl}\n\n{hashtags}".Trim();
-            var instagramCaption = $"{body}\n\nƏtraflı: volt.az (bioda link)\n\n{hashtags}".Trim();
+
+            // Price and the order call-to-action are appended deterministically from our own data,
+            // never left to the AI, so they can never be wrong or invented.
+            var priceLine = candidate.SourceType == "product" && candidate.Price is > 0
+                ? $"\n\nQiymət: {candidate.Price} AZN."
+                : string.Empty;
+            var instagramCta = candidate.SourceType == "product"
+                ? "Sifariş üçün bio-dakı linkə baxın."
+                : "Ətraflı üçün bio-dakı linkə baxın.";
+
+            var facebookCaption = $"{body}{priceLine}\n\n{candidate.LinkUrl}\n\n{hashtags}".Trim();
+            var instagramCaption = $"{body}{priceLine}\n\n{instagramCta}\n\n{hashtags}".Trim();
 
             var now = DateTime.UtcNow;
             var status = _options.DryRun ? "dryrun" : "publishing";
@@ -537,7 +552,7 @@ namespace Volt.API.Services
                 - Use ONLY facts present in the data above. Never invent or round numbers, dates, prices, discounts, certifications, warranty or stock. If a figure is not in the data, leave it out.
                 - No hype or clickbait: no 'şok', 'inanılmaz', 'ən yaxşı', 'qaçırmayın', 'breaking', no ALL CAPS shouting, no exclamation chains.
                 - At most {_options.MaxEmojis} emojis, only where natural. Do not start with a generic filler opener.
-                - For products do not mention a price unless it is present in the data, and never claim a discount or promotion unless the data says so.
+                - For products: never state the price or a call to order yourself; the price and an order link are appended automatically after your text. Never claim a discount or promotion unless the data says so.
                 - Keep the caption under {_options.MaxCaptionChars - 200} characters.
                 """;
 
