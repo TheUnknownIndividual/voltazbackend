@@ -46,14 +46,16 @@ if [ -n "$DATABASE_NAME" ] && [[ ! "$DATABASE_NAME" =~ ^[A-Za-z0-9_-]+$ ]]; then
   exit 1
 fi
 
-for command_name in dotnet perl zip scp ssh curl; do
+REQUIRED_COMMANDS=(dotnet perl zip)
+if [ -z "${PACKAGE_ONLY:-}" ]; then REQUIRED_COMMANDS+=(scp ssh curl); fi
+for command_name in "${REQUIRED_COMMANDS[@]}"; do
   command -v "$command_name" >/dev/null || {
     echo "$command_name is required but was not found." >&2
     exit 1
   }
 done
 
-if [ ! -f "$SSH_KEY" ]; then
+if [ -z "${PACKAGE_ONLY:-}" ] && [ ! -f "$SSH_KEY" ]; then
   echo "SSH key was not found: $SSH_KEY" >&2
   exit 1
 fi
@@ -162,6 +164,19 @@ echo "Compressing API package..."
   cd "$PUBLISH_DIR"
   zip -qr "$PACKAGE_PATH" . -x '*.pdb' '*.xml' '*.map' '__MACOSX/*' '.DS_Store'
 )
+
+if [ -n "${PACKAGE_ONLY:-}" ]; then
+  PACKAGE_OUT_DIR="${PACKAGE_OUT_DIR:-$HOME/Desktop/volt-deploy-packages}"
+  mkdir -p "$PACKAGE_OUT_DIR"
+  cp "$PACKAGE_PATH" "$SCRIPT_DIR/install-api-ssh.ps1" "$PACKAGE_OUT_DIR/"
+  echo
+  echo "PACKAGE_ONLY: built but NOT uploaded. Files are in: $PACKAGE_OUT_DIR"
+  echo "  $PACKAGE_NAME"
+  echo "  install-api-ssh.ps1"
+  echo "Install on the server (PowerShell, as admin) with:"
+  echo "  powershell -NoProfile -ExecutionPolicy Bypass -File <folder>\\install-api-ssh.ps1 -PackagePath <folder>\\$PACKAGE_NAME -TargetPath "$REMOTE_TARGET""
+  exit 0
+fi
 
 SSH_OPTIONS=(
   -i "$SSH_KEY"
