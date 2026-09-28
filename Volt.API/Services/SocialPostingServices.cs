@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Volt.Application.Common;
 using Volt.Application.Configuration;
+using Volt.Application.ContentAi;
 using Volt.Domain.Entities;
 using Volt.Domain.Enums;
 using Volt.Infrastructure.Data;
@@ -27,6 +28,9 @@ namespace Volt.API.Services
         public bool Post { get; set; }
         public int Score { get; set; }
         public bool SameTopicAsRecent { get; set; }
+        public bool IsSolarRelated { get; set; }
+        // Educational posts only: the attention-grabbing question printed on the card image.
+        public string Hook { get; set; } = string.Empty;
         public string TopicKey { get; set; } = string.Empty;
         public string Caption { get; set; } = string.Empty;
         public string[] Hashtags { get; set; } = Array.Empty<string>();
@@ -107,6 +111,7 @@ namespace Volt.API.Services
         private readonly MarketplaceAiClient _ai;
         private readonly MarketplaceProductLoader _productLoader;
         private readonly SocialImageService _images;
+        private readonly SocialCardService _cards;
         private readonly MetaSocialPublisher _publisher;
         private readonly ILogger<SocialPostingRunner> _logger;
 
@@ -117,6 +122,7 @@ namespace Volt.API.Services
             MarketplaceAiClient ai,
             MarketplaceProductLoader productLoader,
             SocialImageService images,
+            SocialCardService cards,
             MetaSocialPublisher publisher,
             ILogger<SocialPostingRunner> logger)
         {
@@ -126,6 +132,7 @@ namespace Volt.API.Services
             _ai = ai;
             _productLoader = productLoader;
             _images = images;
+            _cards = cards;
             _publisher = publisher;
             _logger = logger;
         }
@@ -157,16 +164,18 @@ namespace Volt.API.Services
                 .CountAsync(ct);
             if (postedToday >= Math.Max(1, _options.MaxPostsPerDay)) return;
 
-            var wantNews = await WantNewsAsync(ct);
-            var order = wantNews ? new[] { "news", "product" } : new[] { "product", "news" };
+            var order = await ChooseTypeOrderAsync(ct);
 
             var evaluated = 0;
             foreach (var type in order)
             {
                 if (type == "product" && await ProductWeeklyCapReachedAsync(ct)) continue;
-                var candidates = type == "news"
-                    ? await GetNewsCandidatesAsync(ct)
-                    : await GetProductCandidatesAsync(ct);
+                var candidates = type switch
+                {
+                    "news" => await GetNewsCandidatesAsync(ct),
+                    "education" => await GetEducationCandidatesAsync(ct),
+                    _ => await GetProductCandidatesAsync(ct),
+                };
                 foreach (var candidate in candidates)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -176,7 +185,10 @@ namespace Volt.API.Services
             }
         }
 
-        private async Task<bool> WantNewsAsync(CancellationToken ct)
+        // Orders the content types by how far each is below its target share over the last ~14 posts,
+        // and never puts an educational post directly after another one. Types with no passing
+        // candidate simply fall through to the next in the list.
+        private async Task<string[]> ChooseTypeOrderAsync(CancellationToken ct)
         {
             var recent = await _context.SocialPosts.AsNoTracking()
                 .Where(x => x.Platform == "facebook" && (x.Status == "published" || x.Status == "dryrun" || x.Status == "publishing"))
@@ -184,9 +196,68 @@ namespace Volt.API.Services
                 .Select(x => x.SourceType)
                 .Take(14)
                 .ToListAsync(ct);
-            if (recent.Count == 0) return true;
-            var newsShare = (double)recent.Count(x => x == "news") / recent.Count;
-            return newsShare < Math.Clamp(_options.NewsShare, 0, 1);
+
+            double Share(string type) => recent.Count == 0 ? 0 : (double)recent.Count(x => x == type) / recent.Count;
+            var targets = new (string Type, double Target)[]
+            {
+                ("news", Math.Clamp(_options.NewsShare, 0, 1)),
+                ("product", Math.Clamp(_options.ProductShare, 0, 1)),
+                ("education", Math.Clamp(_options.EducationShare, 0, 1)),
+            };
+
+            var ordered = targets
+                .OrderByDescending(x => x.Target - Share(x.Type))
+                .ThenByDescending(x => x.Target)
+                .Select(x => x.Type)
+                .ToList();
+
+            if (recent.Count > 0 && recent[0] == "education")
+            {
+                ordered.Remove("education");
+                ordered.Add("education");
+            }
+            return ordered.ToArray();
+        }
+
+        private async Task<List<SocialCandidate>> GetEducationCandidatesAsync(CancellationToken ct)
+        {
+            var topics = SocialEducationBank.GetTopics();
+            var cooldownSince = DateTime.UtcNow.AddDays(-Math.Max(1, _options.EducationCooldownDays));
+            var retryRejectedSince = DateTime.UtcNow.AddDays(-3);
+
+            // SourceId = topicId + 1000 * cycle, so a topic can return later without breaking the unique key.
+            var history = await _context.SocialPosts.AsNoTracking()
+                .Where(x => x.SourceType == "education" && x.Platform == "facebook")
+                .Select(x => new { x.SourceId, x.Status, x.CreatedAt })
+                .ToListAsync(ct);
+
+            var lastAttemptByTopic = history
+                .GroupBy(x => x.SourceId % 1000)
+                .ToDictionary(g => g.Key, g => new
+                {
+                    Cycles = g.Select(x => x.SourceId).Distinct().Count(),
+                    LastPosted = g.Where(x => x.Status != "rejected").Select(x => (DateTime?)x.CreatedAt).Max(),
+                    LastAttempt = g.Max(x => x.CreatedAt),
+                });
+
+            var eligible = topics
+                .Where(t =>
+                {
+                    if (!lastAttemptByTopic.TryGetValue(t.Id, out var h)) return true;
+                    if (h.LastPosted is { } posted && posted >= cooldownSince) return false;
+                    return h.LastAttempt < retryRejectedSince || h.LastPosted is not null;
+                })
+                .OrderBy(t => lastAttemptByTopic.TryGetValue(t.Id, out var h) ? h.LastAttempt : DateTime.MinValue)
+                .ThenBy(t => t.Id)
+                .Take(2)
+                .ToList();
+
+            return eligible.Select(t =>
+            {
+                var cycles = lastAttemptByTopic.TryGetValue(t.Id, out var h) ? h.Cycles : 0;
+                var sourceText = $"{t.Topic}\n{string.Join("\n", t.Facts)}";
+                return new SocialCandidate("education", t.Id + 1000 * cycles, t.Topic, sourceText, null, $"{SiteBase}{t.Path}");
+            }).ToList();
         }
 
         private async Task<bool> ProductWeeklyCapReachedAsync(CancellationToken ct)
@@ -340,14 +411,18 @@ namespace Volt.API.Services
                 return false;
             }
 
-            var imageUrl = await _images.PrepareAsync(candidate.ImageUrl, ct);
+            // Educational posts use a generated question card; everything else uses its own cover/product photo.
+            var imageUrl = candidate.SourceType == "education"
+                ? await _cards.RenderAndUploadAsync(decision.Hook, ct)
+                : await _images.PrepareAsync(candidate.ImageUrl, ct);
             if (imageUrl is null)
             {
                 await StoreRejectionAsync(candidate, decision, "Image is missing or not usable for Instagram.", ct);
                 return false;
             }
 
-            var hashtags = BuildHashtags(decision.Hashtags);
+            // Solar tags only when the post is genuinely about solar (educational posts always are).
+            var hashtags = BuildHashtags(decision.Hashtags, candidate.SourceType == "education" || decision.IsSolarRelated);
 
             // Price and the order call-to-action are appended deterministically from our own data,
             // never left to the AI, so they can never be wrong or invented.
@@ -419,15 +494,27 @@ namespace Volt.API.Services
             var banned = SocialTextRules.BannedPhrase(body);
             if (banned is not null) return $"Caption uses a banned phrase: {banned}.";
 
+            if (candidate.SourceType == "education")
+            {
+                var hook = decision.Hook.Trim();
+                if (hook.Length is < 15 or > 110) return "Educational hook must be 15-110 characters.";
+                if (!hook.EndsWith('?')) return "Educational hook must be a question.";
+                var hookUngrounded = SocialTextRules.UngroundedNumber(hook, candidate.SourceText);
+                if (hookUngrounded is not null) return $"Hook contains a figure not present in the source: {hookUngrounded}.";
+                var hookBanned = SocialTextRules.BannedPhrase(hook);
+                if (hookBanned is not null) return $"Hook uses a banned phrase: {hookBanned}.";
+            }
+
             if (SocialTextRules.CountEmojis(body) > _options.MaxEmojis) return "Too many emojis.";
             if (body.Contains("http", StringComparison.OrdinalIgnoreCase) || body.Contains('#')) return "Caption must not contain links or hashtags.";
             return null;
         }
 
-        private string BuildHashtags(IEnumerable<string> aiTags)
+        private string BuildHashtags(IEnumerable<string> aiTags, bool solarRelated)
         {
             var tags = new List<string>();
-            foreach (var tag in _options.BrandHashtags.Concat(aiTags))
+            var baseTags = solarRelated ? _options.BrandHashtags.Concat(_options.SolarHashtags) : _options.BrandHashtags;
+            foreach (var tag in baseTags.Concat(aiTags))
             {
                 var clean = SocialTextRules.SanitizeHashtag(tag);
                 if (clean.Length is < 3 or > 40) continue;
@@ -527,8 +614,34 @@ namespace Volt.API.Services
         {
             var recentJson = JsonSerializer.Serialize(recent.Take(Math.Max(5, _options.RecentPostsForDedupe))
                 .Select(x => new { topicKey = x.TopicKey, caption = Truncate(x.Caption, 220) }));
-            var sourceLabel = candidate.SourceType == "news" ? "NEWS ARTICLE (already published on volt.az)" : "VOLT.AZ PRODUCT DATA";
+            var isEducation = candidate.SourceType == "education";
+            var sourceLabel = candidate.SourceType switch
+            {
+                "news" => "NEWS ARTICLE (already published on volt.az)",
+                "education" => "VERIFIED VOLT.AZ FACTS ABOUT ONE TOPIC (the only permitted source of answers)",
+                _ => "VOLT.AZ PRODUCT DATA",
+            };
             var source = Truncate(candidate.SourceText, 6000);
+
+            var typeRules = candidate.SourceType switch
+            {
+                "news" => """
+                    - SOLAR FOCUS (mandatory for news): post:true only if the article is about solar power, energy storage/batteries, grid connection or net-metering, or tariffs/incentives/regulation that concretely affect people who buy solar systems. Hydro, wind, oil and gas, and general ministry or political news must be post:false, unless the article itself states a clear link to solar buyers.
+                    - caption: 2-4 short sentences in natural, calm Azerbaijani: what happened and why it matters for solar/energy users in Azerbaijan.
+                    - hook: return an empty string.
+                    """,
+                "education" => """
+                    - This is an EDUCATIONAL post. post:true when the facts answer the topic clearly; use only these facts, nothing else, and do not add background knowledge, statistics or comparisons of your own.
+                    - hook: ONE attention-grabbing question in Azerbaijani (15-110 characters, ends with '?') that a curious homeowner would ask about this topic. It is printed large on an image, so keep it short and punchy, with no numbers unless they appear in the facts, and no clickbait words.
+                    - caption: start by answering the hook question directly in one or two sentences. Then add 2-3 short related question-and-answer lines in the form 'Sual? Cavab.' that come strictly from the facts (for example a follow-up such as what it depends on, or what to do next). Natural, calm Azerbaijani, no headings. If the facts do not support a related Q&A line, write fewer lines rather than inventing one.
+                    - Speak as the company ('biz') rather than naming Solarix or Volt.az, and do not promise results, savings or timelines beyond what the facts say.
+                    """,
+                _ => """
+                    - caption: 2-4 short sentences in natural, calm Azerbaijani: what the product is and who it suits, using only the listed specifications.
+                    - For products: never state the price or a call to order yourself; the price and an order link are appended automatically after your text. Never claim a discount or promotion unless the data says so.
+                    - hook: return an empty string.
+                    """,
+            };
 
             var prompt = $"""
                 You are the social media editor of Volt.az, a solar and renewable-energy company in Azerbaijan. You post at most ONE item per day to Facebook and Instagram, so every post must be genuinely worth a follower's attention. Skipping is the default: post only when it clearly earns a place.
@@ -540,19 +653,19 @@ namespace Volt.API.Services
                 {recentJson}
 
                 Decide and write:
-                - post: true only if the item has at least one concrete, verifiable fact a solar/energy-interested reader in Azerbaijan would find useful or interesting (a project, capacity, tariff, rule, tender, technology step, or - for products - a real product with real specifications). False for vague, promotional-fluff, purely political, repetitive or thin items.
-                - sameTopicAsRecent: true if the same event, announcement or product angle is already covered by a recent post.
-                - topicKey: a short lowercase-hyphenated key for the underlying event or product (e.g. 'winter-tariff-2026', 'growatt-10kw-inverter'). Same event => same key.
+                - post: true only if the item has at least one concrete, verifiable fact a solar/energy-interested reader in Azerbaijani would find useful or interesting. False for vague, promotional-fluff, purely political, repetitive or thin items.
+                - sameTopicAsRecent: true if the same event, announcement, question or product angle is already covered by a recent post.
+                - isSolarRelated: true only if the post is genuinely about solar power, solar panels, inverters or storage for solar systems.
+                - topicKey: a short lowercase-hyphenated key for the underlying event, question or product (e.g. 'winter-tariff-2026', 'net-metering-explained'). Same subject => same key.
                 - score: 0-100 honest quality score (relevance to Volt's audience, concreteness, freshness, non-repetition). Use 80+ only for posts you would be proud of.
-                - caption: 2-4 short sentences in natural, calm Azerbaijani. For news: what happened and why it matters for solar/energy users in Azerbaijan. For a product: what it is and who it suits, using only the listed specifications. No links, no hashtags, no headings.
-                - hashtags: up to 3 extra topical hashtags (no # sign), Latin or Azerbaijani letters only.
+                - hashtags: up to 3 extra topical hashtags (no # sign), Latin or Azerbaijani letters only. Do not include hashtags about solar unless isSolarRelated is true.
                 - reason: one sentence explaining the decision.
+                {typeRules}
 
                 Hard rules for the caption:
                 - Use ONLY facts present in the data above. Never invent or round numbers, dates, prices, discounts, certifications, warranty or stock. If a figure is not in the data, leave it out.
                 - No hype or clickbait: no 'şok', 'inanılmaz', 'ən yaxşı', 'qaçırmayın', 'breaking', no ALL CAPS shouting, no exclamation chains.
-                - At most {_options.MaxEmojis} emojis, only where natural. Do not start with a generic filler opener.
-                - For products: never state the price or a call to order yourself; the price and an order link are appended automatically after your text. Never claim a discount or promotion unless the data says so.
+                - At most {_options.MaxEmojis} emojis, only where natural. Do not start with a generic filler opener. No links and no hashtags inside the caption.
                 - Keep the caption under {_options.MaxCaptionChars - 200} characters.
                 """;
 
@@ -560,12 +673,14 @@ namespace Volt.API.Services
             {
                 ["type"] = "object",
                 ["additionalProperties"] = false,
-                ["required"] = new JsonArray("post", "score", "sameTopicAsRecent", "topicKey", "caption", "hashtags", "reason"),
+                ["required"] = new JsonArray("post", "score", "sameTopicAsRecent", "isSolarRelated", "topicKey", "hook", "caption", "hashtags", "reason"),
                 ["properties"] = new JsonObject
                 {
                     ["post"] = new JsonObject { ["type"] = "boolean" },
                     ["score"] = new JsonObject { ["type"] = "integer" },
                     ["sameTopicAsRecent"] = new JsonObject { ["type"] = "boolean" },
+                    ["isSolarRelated"] = new JsonObject { ["type"] = "boolean" },
+                    ["hook"] = new JsonObject { ["type"] = "string" },
                     ["topicKey"] = new JsonObject { ["type"] = "string" },
                     ["caption"] = new JsonObject { ["type"] = "string" },
                     ["hashtags"] = new JsonObject { ["type"] = "array", ["items"] = new JsonObject { ["type"] = "string" } },

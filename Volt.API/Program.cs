@@ -368,6 +368,7 @@ namespace Volt.API
             builder.Services.Configure<SocialPostingOptions>(builder.Configuration.GetSection("SocialPosting"));
             builder.Services.AddHttpClient<MetaSocialPublisher>(client => client.Timeout = TimeSpan.FromSeconds(45));
             builder.Services.AddHttpClient<SocialImageService>(client => client.Timeout = TimeSpan.FromSeconds(20));
+            builder.Services.AddScoped<SocialCardService>();
             builder.Services.AddScoped<SocialPostingRunner>();
             builder.Services.AddHostedService<SocialPostingBackgroundService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();

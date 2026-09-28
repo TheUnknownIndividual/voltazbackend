@@ -10,8 +10,11 @@ namespace Volt.Application.Configuration
 
         public int MaxPostsPerDay { get; set; } = 1;
         public int MaxProductPostsPerWeek { get; set; } = 2;
-        // Target share of news among posts (the rest are product promotions).
-        public double NewsShare { get; set; } = 0.7;
+        // Target mix over recent posts; the remainder after news + product is educational Q&A.
+        public double NewsShare { get; set; } = 0.45;
+        public double ProductShare { get; set; } = 0.25;
+        public double EducationShare { get; set; } = 0.30;
+        public int EducationCooldownDays { get; set; } = 90;
         public int PostWindowStartHourLocal { get; set; } = 10;
         public int PostWindowEndHourLocal { get; set; } = 20;
 
@@ -25,7 +28,10 @@ namespace Volt.Application.Configuration
         public int MaxHashtags { get; set; } = 5;
         public int MaxEmojis { get; set; } = 2;
         public int MaxCaptionChars { get; set; } = 900;
-        public string[] BrandHashtags { get; set; } = new[] { "VoltAz", "GünəşEnerjisi", "BərpaOlunanEnerji", "Solar" };
+        // Always added.
+        public string[] BrandHashtags { get; set; } = new[] { "VoltAz", "BərpaOlunanEnerji" };
+        // Added only when the post is genuinely about solar.
+        public string[] SolarHashtags { get; set; } = new[] { "GünəşEnerjisi", "Solar" };
 
         public int MaxImageBytes { get; set; } = 8 * 1024 * 1024;
         public int MaxAttempts { get; set; } = 3;
