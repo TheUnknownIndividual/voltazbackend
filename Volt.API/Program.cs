@@ -45,6 +45,7 @@ namespace Volt.API
             builder.Logging.AddFilter("System.Net.Http.HttpClient.IGoogleReviewsService", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient.MetaSocialPublisher", LogLevel.Warning);
             builder.Logging.AddFilter("System.Net.Http.HttpClient.SocialImageService", LogLevel.Warning);
+            builder.Logging.AddFilter("System.Net.Http.HttpClient.LinkedInSocialPublisher", LogLevel.Warning);
 
             // This optional file is provisioned only on the production server
             // by the FTP deploy script. It keeps Telegram integration secrets
@@ -369,8 +370,11 @@ namespace Volt.API
             builder.Services.AddHttpClient<MetaSocialPublisher>(client => client.Timeout = TimeSpan.FromSeconds(45));
             builder.Services.AddHttpClient<SocialImageService>(client => client.Timeout = TimeSpan.FromSeconds(20));
             builder.Services.AddScoped<SocialCardService>();
+            builder.Services.AddSingleton<LinkedInOAuthStateStore>();
+            builder.Services.AddHttpClient<LinkedInSocialPublisher>(client => client.Timeout = TimeSpan.FromSeconds(30));
             builder.Services.AddScoped<SocialPostingRunner>();
             builder.Services.AddHostedService<SocialPostingBackgroundService>();
+            builder.Services.AddHostedService<LinkedInTokenRefreshBackgroundService>();
             builder.Services.AddScoped<ISeoFeedService, SeoFeedService>();
             builder.Services.AddSingleton<ISeoSubmissionQueue, SeoSubmissionQueue>();
             builder.Services.AddSingleton<ISeoSubmissionService, SeoSubmissionService>();

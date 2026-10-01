@@ -43,5 +43,13 @@ namespace Volt.Application.Configuration
         public string InstagramAccessToken { get; set; } = string.Empty;
         // Instagram tokens live 60 days and are not auto-refreshed; used only to warn the admin.
         public DateTime? InstagramTokenIssuedOn { get; set; }
+
+        // LinkedIn Organization posting (Community Management API). Client id/secret/redirect are
+        // static app config; the live access/refresh tokens are NOT stored here -- see LinkedInCredential
+        // (DB row, read fresh every call so a refresh takes effect without a pool restart).
+        public string LinkedInClientId { get; set; } = string.Empty;
+        public string LinkedInClientSecret { get; set; } = string.Empty;
+        public string LinkedInApiVersion { get; set; } = "202501";
+        public string LinkedInRedirectUri { get; set; } = string.Empty;
     }
 }

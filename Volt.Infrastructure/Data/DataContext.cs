@@ -89,6 +89,7 @@ namespace Volt.Infrastructure.Data
         public DbSet<MarketplaceListing> MarketplaceListings { get; set; }
         public DbSet<SocialPost> SocialPosts { get; set; }
         public DbSet<SocialPostingState> SocialPostingState { get; set; }
+        public DbSet<LinkedInCredential> LinkedInCredential { get; set; }
         public DbSet<RenewableNewsScraperRunState> RenewableNewsScraperRunState { get; set; }
         public DbSet<SolarInverterSpecification> SolarInverterSpecifications { get; set; }
         public DbSet<SolarInverterDatasheetDocument> SolarInverterDatasheetDocuments { get; set; }

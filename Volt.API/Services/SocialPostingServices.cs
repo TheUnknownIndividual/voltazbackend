@@ -113,6 +113,7 @@ namespace Volt.API.Services
         private readonly SocialImageService _images;
         private readonly SocialCardService _cards;
         private readonly MetaSocialPublisher _publisher;
+        private readonly LinkedInSocialPublisher _linkedIn;
         private readonly ILogger<SocialPostingRunner> _logger;
 
         public SocialPostingRunner(
@@ -124,6 +125,7 @@ namespace Volt.API.Services
             SocialImageService images,
             SocialCardService cards,
             MetaSocialPublisher publisher,
+            LinkedInSocialPublisher linkedIn,
             ILogger<SocialPostingRunner> logger)
         {
             _context = context;
@@ -134,6 +136,7 @@ namespace Volt.API.Services
             _images = images;
             _cards = cards;
             _publisher = publisher;
+            _linkedIn = linkedIn;
             _logger = logger;
         }
 
@@ -421,6 +424,8 @@ namespace Volt.API.Services
                 return false;
             }
 
+            var platforms = await ResolvePlatformsAsync(candidate.SourceType, ct);
+
             // Solar tags only when the post is genuinely about solar (educational posts always are).
             var hashtags = BuildHashtags(decision.Hashtags, candidate.SourceType == "education" || decision.IsSolarRelated);
 
@@ -433,14 +438,20 @@ namespace Volt.API.Services
                 ? "Sifariş üçün bio-dakı linkə baxın."
                 : "Ətraflı üçün bio-dakı linkə baxın.";
 
+            // LinkedIn allows a plain link in the body, same as Facebook (no "link in bio" workaround needed).
             var facebookCaption = $"{body}{priceLine}\n\n{candidate.LinkUrl}\n\n{hashtags}".Trim();
             var instagramCaption = $"{body}{priceLine}\n\n{instagramCta}\n\n{hashtags}".Trim();
+            var linkedInCaption = facebookCaption;
 
             var now = DateTime.UtcNow;
             var status = _options.DryRun ? "dryrun" : "publishing";
-            var facebook = NewRow(candidate, "facebook", status, facebookCaption, imageUrl, decision, now);
-            var instagram = NewRow(candidate, "instagram", status, instagramCaption, imageUrl, decision, now);
-            _context.SocialPosts.AddRange(facebook, instagram);
+            var rows = platforms.Select(platform => NewRow(candidate, platform, status, platform switch
+            {
+                "instagram" => instagramCaption,
+                "linkedin" => linkedInCaption,
+                _ => facebookCaption,
+            }, imageUrl, decision, now)).ToList();
+            _context.SocialPosts.AddRange(rows);
             try
             {
                 await _context.SaveChangesAsync(ct);
@@ -458,9 +469,17 @@ namespace Volt.API.Services
                 return true;
             }
 
-            await PublishRowAsync(facebook, ct);
-            await PublishRowAsync(instagram, ct);
+            foreach (var row in rows) await PublishRowAsync(row, ct);
             return true;
+        }
+
+        // Facebook + Instagram always; LinkedIn only for news/education (not product ads) and only once
+        // the admin has connected it (an unconfigured/disconnected LinkedIn is simply skipped, never an error).
+        private async Task<List<string>> ResolvePlatformsAsync(string sourceType, CancellationToken ct)
+        {
+            var platforms = new List<string> { "facebook", "instagram" };
+            if (sourceType != "product" && await _linkedIn.IsConnectedAsync(ct)) platforms.Add("linkedin");
+            return platforms;
         }
 
         private string? Validate(
@@ -545,7 +564,7 @@ namespace Volt.API.Services
         private async Task StoreRejectionAsync(SocialCandidate candidate, SocialAiDecision decision, string reason, CancellationToken ct)
         {
             var now = DateTime.UtcNow;
-            foreach (var platform in new[] { "facebook", "instagram" })
+            foreach (var platform in await ResolvePlatformsAsync(candidate.SourceType, ct))
             {
                 var row = NewRow(candidate, platform, "rejected", decision.Caption, candidate.ImageUrl ?? string.Empty, decision, now);
                 row.RejectReason = Truncate(reason, 500);
@@ -568,9 +587,12 @@ namespace Volt.API.Services
             row.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync(ct);
 
-            var result = row.Platform == "facebook"
-                ? await _publisher.PublishFacebookAsync(row.ImageUrl ?? string.Empty, row.Caption ?? string.Empty, ct)
-                : await _publisher.PublishInstagramAsync(row.ImageUrl ?? string.Empty, row.Caption ?? string.Empty, ct);
+            var result = row.Platform switch
+            {
+                "facebook" => await _publisher.PublishFacebookAsync(row.ImageUrl ?? string.Empty, row.Caption ?? string.Empty, ct),
+                "linkedin" => await _linkedIn.PublishAsync(row.ImageUrl ?? string.Empty, row.Caption ?? string.Empty, ct),
+                _ => await _publisher.PublishInstagramAsync(row.ImageUrl ?? string.Empty, row.Caption ?? string.Empty, ct),
+            };
 
             row.UpdatedAt = DateTime.UtcNow;
             if (result.Ok)

@@ -6,6 +6,9 @@
     "FacebookPageAccessToken": "",
     "InstagramUserId": "",
     "InstagramAccessToken": "",
-    "InstagramTokenIssuedOn": "2026-09-25"
+    "InstagramTokenIssuedOn": "2026-09-25",
+    "LinkedInClientId": "",
+    "LinkedInClientSecret": "",
+    "LinkedInRedirectUri": "https://api.volt.az/api/SocialPosts/linkedin/callback"
   }
 }
