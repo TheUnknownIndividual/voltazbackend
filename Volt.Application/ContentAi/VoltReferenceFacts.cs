@@ -40,9 +40,9 @@ namespace Volt.Application.ContentAi
             },
             InstallationPackages: new[]
             {
-                new InstallationPackageFact(5m, 4250m, 9, 650),
-                new InstallationPackageFact(10m, 8500m, 17, 650),
-                new InstallationPackageFact(15m, 12750m, 26, 650),
+                new InstallationPackageFact(5m, 5000m, 9, 650),
+                new InstallationPackageFact(10m, 10000m, 17, 650),
+                new InstallationPackageFact(15m, 15000m, 26, 650),
             },
             LegislationHighlights: new[]
             {
