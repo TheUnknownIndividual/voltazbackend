@@ -293,6 +293,11 @@ namespace Volt.API
                 client.BaseAddress = new Uri("https://maps.googleapis.com/");
                 client.Timeout = TimeSpan.FromSeconds(8);
             });
+            builder.Services.AddHttpClient<ISolarYieldService, PvgisSolarYieldService>(client =>
+            {
+                client.BaseAddress = new Uri("https://re.jrc.ec.europa.eu/");
+                client.Timeout = TimeSpan.FromSeconds(10);
+            });
             builder.Services.AddScoped<IAcceptLanguageService, AcceptLanguageService>();
             builder.Services.Configure<MetaInboxOptions>(builder.Configuration.GetSection("MetaInbox"));
             builder.Services.AddSingleton<MetaWebhookDiagnostics>();
