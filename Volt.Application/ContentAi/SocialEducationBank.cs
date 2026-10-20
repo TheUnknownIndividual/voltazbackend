@@ -19,7 +19,7 @@ namespace Volt.Application.ContentAi
 
             var packageFacts = reference.InstallationPackages
                 .Select(p => $"{p.CapacityKw.ToString("0.##", CultureInfo.InvariantCulture)} kW quraşdırma paketi: " +
-                             $"{p.PanelCount} ədəd {p.PanelWattageW} W günəş paneli, qiyməti {p.PriceAzn.ToString("0.##", CultureInfo.InvariantCulture)} AZN (dam montajı, ƏDV daxil).")
+                             $"{p.PanelCount} ədəd {p.PanelWattageW} W günəş paneli, qiyməti dam montajı ilə {p.PriceAzn.ToString("0.##", CultureInfo.InvariantCulture)} AZN, torpaq montajı ilə {p.GroundMountPriceAzn.ToString("0.##", CultureInfo.InvariantCulture)} AZN (ƏDV daxil).")
                 .ToList();
 
             return new List<EducationTopic>
@@ -35,7 +35,7 @@ namespace Volt.Application.ContentAi
                 }, "/faq"),
                 new(3, "cost-per-kw", "1 kW günəş sistemi neçəyə başa gəlir?", new[]
                 {
-                    "Ümumi hesabla 1 kW günəş enerji sisteminin qiyməti təxminən 1000 AZN-dən başlaya bilər.",
+                    "Ümumi hesabla 1 kW günəş enerji sisteminin qiyməti dam montajı üçün 1180 AZN, torpaq montajı üçün 1535 AZN-dir (ƏDV daxil).",
                     "Yekun qiymət panel və inverter markası, dam növü, montajın çətinliyi, kabel məsafəsi, elektrik lövhəsinin vəziyyəti, sənədləşmə tələbləri, sistemin gücü və quraşdırma şəraitindən asılıdır.",
                     "Qiyməti öz obyektiniz üçün təxmini hesablamaq üçün saytdakı günəş kalkulyatorundan istifadə edə bilərsiniz.",
                 }, "/calculator"),

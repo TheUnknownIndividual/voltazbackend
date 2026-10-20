@@ -1,6 +1,6 @@
 namespace Volt.Application.ContentAi
 {
-    public sealed record InstallationPackageFact(decimal CapacityKw, decimal PriceAzn, int PanelCount, int PanelWattageW);
+    public sealed record InstallationPackageFact(decimal CapacityKw, decimal PriceAzn, decimal GroundMountPriceAzn, int PanelCount, int PanelWattageW);
     public sealed record FaqFact(string Question, string Answer);
 
     public sealed record VoltReferenceContext(
@@ -38,12 +38,13 @@ namespace Volt.Application.ContentAi
                 "Quraşdırma",
                 "Layihələndirmə və ROI",
             },
-            // Roof-mount package prices, ƏDV (18%) included: 1180 AZN/kW.
+            // Package prices, ƏDV (18%) included: roof mount 1180 AZN/kW, ground mount 1535 AZN/kW
+            // (frontend utils/solarPricing.ts).
             InstallationPackages: new[]
             {
-                new InstallationPackageFact(5m, 5900m, 9, 650),
-                new InstallationPackageFact(10m, 11800m, 17, 650),
-                new InstallationPackageFact(15m, 17700m, 26, 650),
+                new InstallationPackageFact(5m, 5900m, 7675m, 9, 650),
+                new InstallationPackageFact(10m, 11800m, 15350m, 17, 650),
+                new InstallationPackageFact(15m, 17700m, 23025m, 26, 650),
             },
             LegislationHighlights: new[]
             {
