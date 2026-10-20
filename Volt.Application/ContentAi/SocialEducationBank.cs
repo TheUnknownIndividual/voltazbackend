@@ -19,7 +19,7 @@ namespace Volt.Application.ContentAi
 
             var packageFacts = reference.InstallationPackages
                 .Select(p => $"{p.CapacityKw.ToString("0.##", CultureInfo.InvariantCulture)} kW quraşdırma paketi: " +
-                             $"{p.PanelCount} ədəd {p.PanelWattageW} W günəş paneli, qiyməti {p.PriceAzn.ToString("0.##", CultureInfo.InvariantCulture)} AZN.")
+                             $"{p.PanelCount} ədəd {p.PanelWattageW} W günəş paneli, qiyməti {p.PriceAzn.ToString("0.##", CultureInfo.InvariantCulture)} AZN (dam montajı, ƏDV daxil).")
                 .ToList();
 
             return new List<EducationTopic>

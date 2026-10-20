@@ -38,11 +38,12 @@ namespace Volt.Application.ContentAi
                 "Quraşdırma",
                 "Layihələndirmə və ROI",
             },
+            // Roof-mount package prices, ƏDV (18%) included: 1180 AZN/kW.
             InstallationPackages: new[]
             {
-                new InstallationPackageFact(5m, 5000m, 9, 650),
-                new InstallationPackageFact(10m, 10000m, 17, 650),
-                new InstallationPackageFact(15m, 15000m, 26, 650),
+                new InstallationPackageFact(5m, 5900m, 9, 650),
+                new InstallationPackageFact(10m, 11800m, 17, 650),
+                new InstallationPackageFact(15m, 17700m, 26, 650),
             },
             LegislationHighlights: new[]
             {
